@@ -28,7 +28,7 @@ export default function GrayRecutCase() {
           <h2 id="front-title" className="mb-4 text-[23px] font-bold">01. 앞면의 변화</h2>
           <GrayCaseCompare side="front" />
           <a href="#patch-shop" className="mt-3 inline-block min-h-10 text-sm font-semibold underline underline-offset-4">이 사진 속 패치 골라 담기 ↓</a>
-          <p className="mt-4 text-[13.5px] leading-6 text-muted">기존 눈 모양 장식에 다양한 패치를 더했어요. 재단한 소매와 옆구리의 열린 구조가 새로운 실루엣을 만들어요.</p>
+          <p className="mt-4 text-[13.5px] leading-6 text-muted">눈 모양과 다양한 컬러 패치로 달라지는 모습을 비교해 보세요. 재단한 소매와 옆구리의 열린 구조가 새로운 실루엣을 만들어요.</p>
         </section>
         <section id="back" className="mt-9 scroll-mt-5 px-5" aria-labelledby="back-title">
           <h2 id="back-title" className="mb-4 text-[23px] font-bold">02. 뒷면의 변화</h2>
@@ -36,7 +36,7 @@ export default function GrayRecutCase() {
           <a href="#patch-shop" className="mt-3 inline-block min-h-10 text-sm font-semibold underline underline-offset-4">뒷판 전사지·눈 모양 패치 보기 ↓</a>
           <p className="mt-4 text-[13.5px] leading-6 text-muted">단정했던 등판에 재봉 도구 그림을 더하고, 재단과 연결의 흔적을 디자인으로 살렸어요.</p>
         </section>
-        <p className="mx-5 mt-7 border-t border-line pt-5 text-[11px] leading-6 text-muted">제공된 리폼 전후 사진을 바탕으로 배경·주름·색감을 AI로 정리한 비교 이미지입니다. 어깨와 길이를 기준으로 배치를 맞췄으며, 리폼으로 달라진 몸판 폭과 소매 구조는 비교 대상에 포함됩니다.</p>
+        <p className="mx-5 mt-7 border-t border-line pt-5 text-[11px] leading-6 text-muted">제공된 리폼 전후 사진을 바탕으로 배경·주름·색감을 AI로 정리한 비교 이미지입니다. 앞면 비포는 눈 모양 패치를 제거하고 목 안쪽을 연한 회색으로 맞춘 AI 재구성입니다. 어깨와 길이를 기준으로 배치를 맞췄으며, 리폼으로 달라진 몸판 폭과 소매 구조는 비교 대상에 포함됩니다.</p>
         <section className="mx-5 mt-8 rounded-[22px] bg-white p-5" aria-labelledby="price-title">
           <h2 id="price-title" className="text-[23px] font-bold">원하는 만큼 더하는 리폼</h2>
           <p className="mt-3 text-[13.5px] leading-6 text-muted">품을 넓혀 원피스 위에도 어울리는 여성스러운 실루엣으로. 장식은 모두 붙일 필요 없이 원하는 것만, 원하는 위치에 더할 수 있어요.</p>

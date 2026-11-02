@@ -13,7 +13,7 @@ export function GrayCaseCompare({ side }: { side: "front" | "back" }) {
         <img src={side === "back" ? "/cases/gray-recut/after-back-junction.png" : "/cases/gray-recut/after-front.png"} alt={`회색 티 리폼 후 ${label} · 사진 기반 AI 정리`} className="absolute inset-0 h-full w-full origin-top object-contain" style={{ transform: side === "front" ? "translateY(2%) scaleY(0.97)" : "translateY(0.5%) scaleY(0.99)" }} />
         <div className="absolute inset-0" style={{ clipPath: `inset(0 ${100 - split}% 0 0)` }}>
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={`/cases/gray-recut/before-${side}.png`} alt={`회색 티 리폼 전 ${label} · 사진 기반 AI 정리`} className="h-full w-full object-contain" />
+          <img src={side === "front" ? "/cases/gray-recut/before-front-plain.png" : "/cases/gray-recut/before-back.png"} alt={`회색 티 리폼 전 ${label} · 사진 기반 AI 정리`} className="h-full w-full object-contain" />
         </div>
         <span className="pointer-events-none absolute left-3 top-3 rounded-full bg-black/65 px-3 py-2 text-[11px] font-semibold text-white">비포 · {label}</span>
         <span className="pointer-events-none absolute right-3 top-3 rounded-full bg-[#53634b] px-3 py-2 text-[11px] font-semibold text-white">애프터 · {label}</span>
