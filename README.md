@@ -4,4 +4,5 @@
 
 - `기획/`: 서비스 기획서, 클라이언트 확인 질문지, 조사 자료
 - `web/`: 고객 화면과 운영 콘솔 시안(Next.js). 실행 방법은 `web/README.md`에 있습니다.
+- 작업을 이어받는 분은 [HANDOFF.md](HANDOFF.md)의 최신 화면 구성·이미지·주의사항부터 확인해 주세요.
 - 시연 주소: https://reformcvs-demo.vercel.app (AI 생성·결제·로그인은 흉내만 냅니다)

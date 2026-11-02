@@ -4,29 +4,13 @@ import { Camera, ChevronRight, Package, Scissors, Shirt, Sparkles, Store } from 
 import Link from "next/link";
 import { useState } from "react";
 import { Logo, PhoneFrame } from "@/components/app-frame";
-import { DesignSwatch, MockupStage } from "@/components/mockup-stage";
+import { DesignSwatch } from "@/components/mockup-stage";
 import { LinkButton, Toast } from "@/components/ui";
 import { DESIGNS } from "@/lib/designs";
-import { garmentFromSample } from "@/lib/factory";
+import { RealCaseCompare } from "@/components/real-case-compare";
 import { won } from "@/lib/format";
 import { SAMPLE_GARMENTS } from "@/lib/garments";
 import { dispatch } from "@/lib/store";
-
-const hero = garmentFromSample("denim-jacket", "hero", 0, true);
-const heroLayers = [
-  {
-    designSlug: "daisy-embroidery",
-    options: { placement: "left-chest" as const, pos: hero.anchors["left-chest"]!, sizeCm: 8.5, colorId: "white", text: "" },
-  },
-  {
-    designSlug: "smile-wappen",
-    options: { placement: "sleeve" as const, pos: hero.anchors.sleeve!, sizeCm: 8.5, colorId: "yellow", text: "" },
-  },
-  {
-    designSlug: "star-patch",
-    options: { placement: "hem" as const, pos: hero.anchors.hem!, sizeCm: 9, colorId: "red", text: "" },
-  },
-];
 
 const STEPS = [
   { icon: Camera, title: "옷 사진 한 장", desc: "바닥에 펼쳐 찍기만 하면 돼요" },
@@ -73,9 +57,21 @@ export default function Landing() {
       </section>
 
       <section className="px-5 pt-6">
-        <MockupStage garment={hero} layers={heroLayers} compare badge />
-        <p className="mt-2.5 text-center text-[12.5px] text-muted">가운데 손잡이를 좌우로 끌어 원본과 비교해 보세요</p>
+        <RealCaseCompare />
+        <Link href="/cases/knit-yarn" className="mt-5 flex items-center gap-4 rounded-[20px] border border-line bg-white p-3">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/cases/knit-yarn/after-long.png" alt="털실로 리폼한 니트 베스트" className="h-24 w-24 rounded-xl object-contain" />
+          <div className="flex-1"><p className="text-[11px] font-bold text-[#53634b]">새로운 리폼 이야기</p><p className="mt-1 text-[15px] font-semibold">보풀난 니트에<br />털실로 더한 새로운 표정</p><p className="mt-2 text-xs text-muted">완성 모습과 디테일 보기 →</p></div>
+        </Link>
       </section>
+
+      <div className="px-5">
+        <Link href="/cases/gray-recut" className="mt-3 flex items-center gap-4 rounded-[20px] border border-line bg-white p-3">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/cases/gray-recut/after-front.png" alt="소매를 재단해 폭을 넓힌 회색 티" className="h-24 w-24 rounded-xl object-contain" />
+          <div className="flex-1"><p className="text-[11px] font-bold text-[#53634b]">앞뒤로 보는 리폼 이야기</p><p className="mt-1 text-[15px] font-semibold">소매를 다시 재단해<br />넉넉해진 회색 티</p><p className="mt-2 text-xs text-muted">앞면·뒷면 비포 애프터 보기 →</p></div>
+        </Link>
+      </div>
 
       <section className="grid gap-2.5 px-5 pt-6">
         <LinkButton href="/capture">
@@ -124,7 +120,7 @@ export default function Landing() {
       <section className="px-5 pt-10">
         <div className="rounded-[20px] border border-dashed border-[#cfc6b8] bg-[#fbf9f5] p-4">
           <div className="flex items-center gap-2 text-[14.5px] font-semibold">
-            <Scissors size={16} className="text-accent" /> 시안은 AI 예시 이미지예요
+            <Scissors size={16} className="text-accent" /> 체험에서 만드는 시안은 AI 예시예요
           </div>
           <p className="mt-1.5 text-[13.5px] leading-relaxed text-muted">
             실제 원단과 조명에 따라 결과가 조금 다를 수 있어요. 옷이 도착하면 실물을 검수하고, 실물 위 확정 시안을 한 번 더 보여 드린 뒤 작업을 시작해요.
