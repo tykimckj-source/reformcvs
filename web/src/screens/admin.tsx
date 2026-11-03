@@ -1,6 +1,6 @@
 "use client";
 
-import { Bell, ClipboardList, Download, ExternalLink, LayoutGrid, LogOut, Palette, Settings, X } from "lucide-react";
+import { Bell, ClipboardList, Copy, Download, ExternalLink, LayoutGrid, LogOut, Palette, Settings, X } from "lucide-react";
 import Link from "next/link";
 import { useCallback, useEffect, useState, type FormEvent } from "react";
 import { Logo } from "@/components/app-frame";
@@ -13,7 +13,7 @@ import { garmentFromSample } from "@/lib/factory";
 import { csv, cx, won, nowMs } from "@/lib/format";
 import { CATEGORY_LABEL, MATERIAL_LABEL, PLACEMENT_LABEL } from "@/lib/garments";
 import { preparePhoto } from "@/lib/image";
-import { CARRIERS, maskName, nextStatus, STATUS_LABEL } from "@/lib/orders";
+import { CARRIERS, contactMessage, maskName, nextStatus, STATUS_LABEL } from "@/lib/orders";
 import { downloadDataUrl } from "@/lib/render";
 import { dispatch, useIsClient, useStore, type State } from "@/lib/store";
 import type { Garment, MockupOptions, Order, OrderStatus } from "@/lib/types";
@@ -207,6 +207,7 @@ export default function AdminBoard() {
       : []
     : [...(isClient ? liveItems(store) : []), ...seedItems(seedStatus)];
   const selected = items.find((i) => i.key === selectedKey) ?? null;
+  const selectedOrder = selected?.order;
   const active = items.filter((i) => i.status !== "DELIVERED").length;
 
   const flash = (message: string) => {
@@ -224,6 +225,17 @@ export default function AdminBoard() {
       URL.createObjectURL(new Blob([boardCsv(items)], { type: "text/csv;charset=utf-8" })),
       `리폼편의점_주문_${kst(nowMs()).slice(0, 10)}.csv`,
     );
+
+  // 작업지시서는 클릭한 뒤에만 열리니 브라우저 주소를 바로 써도 된다
+  const message = (o: Order) => contactMessage(o, `${window.location.origin}/orders/${o.id}`);
+  const copyMessage = async (o: Order) => {
+    try {
+      await navigator.clipboard.writeText(message(o));
+      flash("문구를 복사했어요. 문자나 카카오톡에 붙여 넣으세요");
+    } catch {
+      flash("복사하지 못했어요. 문구를 직접 선택해 복사해 주세요");
+    }
+  };
 
   const advance = async (item: BoardItem, to: OrderStatus, patch: Record<string, unknown> = {}) => {
     if (backendOn && item.orderId) {
@@ -464,6 +476,18 @@ export default function AdminBoard() {
                   </>
                 ) : null}
               </dl>
+              {selectedOrder ? (
+                <div>
+                  <div className="flex items-center justify-between">
+                    <div className="text-[13.5px] font-bold">손님에게 보낼 문구</div>
+                    <Button variant="secondary" size="sm" onClick={() => copyMessage(selectedOrder)}>
+                      <Copy size={14} /> 문구 복사
+                    </Button>
+                  </div>
+                  <p className="mt-2 whitespace-pre-line rounded-xl border border-line p-3 text-[13px] leading-relaxed">{message(selectedOrder)}</p>
+                  <p className="mt-1 text-[12px] text-muted">알림톡을 붙이기 전까지 문자나 카카오톡에 붙여 넣어 보내요.</p>
+                </div>
+              ) : null}
               <div>
                 <div className="text-[13.5px] font-bold">작업 순서</div>
                 <ol className="mt-2 space-y-1.5 text-[13.5px]">
