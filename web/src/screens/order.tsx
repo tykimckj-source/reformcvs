@@ -7,11 +7,11 @@ import { useEffect, useState } from "react";
 import { Missing, PhoneFrame, ScreenSkeleton, TopBar } from "@/components/app-frame";
 import { MockupStage } from "@/components/mockup-stage";
 import { Button, Card, DemoTag, Toast } from "@/components/ui";
-import { answerConfirm, backendOn, rateOrder, shipOrder } from "@/lib/db";
+import { answerConfirm, backendOn, rateOrder, requestCancel, shipOrder } from "@/lib/db";
 import { colorOf, designBySlug } from "@/lib/designs";
 import { cx, timeLabel, won, nowMs } from "@/lib/format";
 import { PLACEMENT_LABEL } from "@/lib/garments";
-import { CARRIERS, nextStatus, ORDER_STEPS, stepIndex, WORKSHOP_ADDRESS } from "@/lib/orders";
+import { CANCELLABLE, CARRIERS, nextStatus, ORDER_STEPS, stepIndex, WORKSHOP_ADDRESS } from "@/lib/orders";
 import { dispatch, useIsClient, useStore } from "@/lib/store";
 import type { OrderStatus } from "@/lib/types";
 import FindOrderScreen from "@/screens/find-order";
@@ -25,6 +25,8 @@ export default function OrderScreen() {
   const [adjusting, setAdjusting] = useState(false);
   const [note, setNote] = useState("");
   const [toast, setToast] = useState<string | null>(null);
+  const [cancelOpen, setCancelOpen] = useState(false);
+  const [cancelReason, setCancelReason] = useState("");
 
   useEffect(() => {
     if (!toast) return;
@@ -113,6 +115,21 @@ export default function OrderScreen() {
       </section>
 
       <section className="px-5 pt-3">
+        {order.cancelRequestedAt && order.status !== "CANCELLED" ? (
+          <div className="mb-3 rounded-2xl bg-[#fbeee9] px-4 py-3 text-[13.5px] font-semibold text-[#a3341f]">
+            취소를 요청했어요. 담당자가 확인하고 반송과 환불을 안내해 드려요.
+          </div>
+        ) : null}
+
+        {order.status === "CANCELLED" ? (
+          <Card>
+            <h2 className="text-[17px] font-bold">주문이 취소됐어요</h2>
+            <p className="mt-1 text-[13.5px] leading-relaxed text-muted">
+              작업실에 도착한 옷이 있으면 돌려보내 드리고, 결제하신 금액은 환불해 드려요. 궁금한 점은 담당자에게 문의해 주세요.
+            </p>
+          </Card>
+        ) : null}
+
         {order.status === "AWAITING_SHIPMENT" ? (
           <Card>
             <h2 className="text-[17px] font-bold">옷을 보내 주세요</h2>
@@ -233,14 +250,9 @@ export default function OrderScreen() {
                 >
                   이대로 진행할게요
                 </Button>
-                <div className="grid grid-cols-2 gap-2">
-                  <Button variant="secondary" size="md" onClick={() => setAdjusting(true)}>
-                    조정 요청
-                  </Button>
-                  <Button variant="secondary" size="md" onClick={() => setToast("취소를 요청했어요. 담당자가 반송과 환불을 안내해 드려요.")}>
-                    주문 취소
-                  </Button>
-                </div>
+                <Button variant="secondary" size="md" onClick={() => setAdjusting(true)}>
+                  조정 요청
+                </Button>
               </div>
             )}
           </Card>
@@ -295,7 +307,55 @@ export default function OrderScreen() {
         ) : null}
       </section>
 
-      <section className="px-5 pt-5">
+      {CANCELLABLE.includes(order.status) && !order.cancelRequestedAt ? (
+        <section className="px-5 pt-5">
+          {cancelOpen ? (
+            <div className="rounded-2xl border border-line bg-white p-4">
+              <div className="text-[14.5px] font-semibold">주문 취소 요청</div>
+              <p className="mt-1 text-[13px] leading-relaxed text-muted">
+                리폼 작업을 시작하기 전까지 취소할 수 있어요. 담당자가 확인한 뒤 반송과 환불을 안내해 드려요.
+              </p>
+              <textarea
+                value={cancelReason}
+                onChange={(e) => setCancelReason(e.target.value)}
+                maxLength={500}
+                placeholder="취소하시는 이유 (선택)"
+                className="mt-2 h-20 w-full resize-none rounded-xl border border-line p-3 text-[14px] outline-none focus:border-ink"
+              />
+              <div className="mt-2 grid grid-cols-2 gap-2">
+                <Button variant="secondary" size="md" onClick={() => setCancelOpen(false)}>
+                  닫기
+                </Button>
+                <Button
+                  size="md"
+                  onClick={() =>
+                    act(
+                      () => requestCancel(order.id, cancelReason.trim()),
+                      () => {
+                        dispatch({
+                          type: "order/update",
+                          id: order.id,
+                          patch: { cancelRequestedAt: nowMs(), cancelReason: cancelReason.trim() || undefined },
+                        });
+                        setCancelOpen(false);
+                      },
+                      "취소를 요청했어요. 담당자가 반송과 환불을 안내해 드려요.",
+                    )
+                  }
+                >
+                  취소 요청 보내기
+                </Button>
+              </div>
+            </div>
+          ) : (
+            <button type="button" onClick={() => setCancelOpen(true)} className="w-full text-center text-[13px] font-semibold text-muted underline underline-offset-4">
+              주문 취소 요청
+            </button>
+          )}
+        </section>
+      ) : null}
+
+      <section className={cx("px-5 pt-5", order.status === "CANCELLED" && "hidden")}>
         <h2 className="text-[15px] font-bold">진행 상황</h2>
         <ol className="mt-3">
           {ORDER_STEPS.map((s, i) => {
@@ -336,7 +396,7 @@ export default function OrderScreen() {
             택배·작업실 쪽에서 일어나는 단계를 넘겨 볼 수 있어요. 운영 콘솔을 다른 탭에서 열면 같은 주문이 함께 움직여요.
           </p>
           <div className="mt-3 grid grid-cols-2 gap-2">
-            <Button variant="dark" size="md" onClick={demoNext} disabled={order.status === "DELIVERED"}>
+            <Button variant="dark" size="md" onClick={demoNext} disabled={order.status === "DELIVERED" || order.status === "CANCELLED"}>
               다음 단계로
             </Button>
             <Link

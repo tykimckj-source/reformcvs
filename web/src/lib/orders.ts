@@ -10,13 +10,19 @@ export const ORDER_STEPS: { status: OrderStatus; label: string; desc: string }[]
   { status: "DELIVERED", label: "받으셨어요", desc: "시안과 얼마나 같은지 알려 주세요" },
 ];
 
-export const STATUS_LABEL: Record<OrderStatus, string> = Object.fromEntries(
-  ORDER_STEPS.map((s) => [s.status, s.label]),
-) as Record<OrderStatus, string>;
+export const STATUS_LABEL = {
+  ...Object.fromEntries(ORDER_STEPS.map((s) => [s.status, s.label])),
+  CANCELLED: "주문 취소",
+} as Record<OrderStatus, string>;
 
 export const stepIndex = (status: OrderStatus) => ORDER_STEPS.findIndex((s) => s.status === status);
 
-export const nextStatus = (status: OrderStatus): OrderStatus | null => ORDER_STEPS[stepIndex(status) + 1]?.status ?? null;
+// 취소는 진행 단계가 아니라서 다음 단계가 없다
+export const nextStatus = (status: OrderStatus): OrderStatus | null =>
+  stepIndex(status) < 0 ? null : (ORDER_STEPS[stepIndex(status) + 1]?.status ?? null);
+
+/** 손님이 취소를 요청할 수 있는 상태: 작업을 시작하기 전까지 (DB의 request_cancel과 같다) */
+export const CANCELLABLE: OrderStatus[] = ["AWAITING_SHIPMENT", "INBOUND_TRANSIT", "INSPECTING", "AWAITING_APPROVAL"];
 
 export const CARRIERS = ["GS25 반값택배", "CU 알뜰택배", "CJ대한통운", "우체국택배", "롯데택배", "한진택배"];
 
@@ -36,6 +42,7 @@ export function contactMessage(order: Pick<Order, "orderNo" | "status" | "custom
     IN_PROGRESS: "확정 시안대로 리폼 작업을 시작했어요. 끝나면 송장 번호와 함께 알려 드릴게요.",
     OUTBOUND_TRANSIT: `리폼을 마치고 옷을 보내 드렸어요.${order.outbound ? ` ${order.outbound.carrier} ${order.outbound.number}` : ""}`,
     DELIVERED: "옷은 잘 받으셨나요? 시안과 얼마나 같았는지 주문 화면에서 별점으로 알려 주세요.",
+    CANCELLED: "주문이 취소됐어요. 작업실에 도착한 옷이 있으면 돌려보내 드리고, 결제하신 금액은 환불해 드려요.",
   };
   return [
     `[리폼 편의점] ${order.customer.name}님, ${say[order.status]}`,

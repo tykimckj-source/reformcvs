@@ -48,7 +48,7 @@ create table public.orders (
   session_id text not null references public.mockup_sessions,
   status text not null default 'AWAITING_SHIPMENT' check (status in (
     'AWAITING_SHIPMENT', 'INBOUND_TRANSIT', 'INSPECTING', 'AWAITING_APPROVAL',
-    'IN_PROGRESS', 'OUTBOUND_TRANSIT', 'DELIVERED'
+    'IN_PROGRESS', 'OUTBOUND_TRANSIT', 'DELIVERED', 'CANCELLED'
   )),
   total integer not null check (total > 0),
   customer jsonb not null,          -- 이름·연락처·주소
@@ -59,6 +59,9 @@ create table public.orders (
   confirm_note text,
   adjust_note text,
   rating smallint check (rating between 1 and 5),
+  measurements jsonb,               -- 입고 검수 실측 (cm)
+  cancel_requested_at timestamptz,  -- 손님이 취소를 요청한 때
+  cancel_reason text,
   created_at timestamptz not null default now()
 );
 
@@ -239,8 +242,26 @@ begin
   end if;
 end $$;
 
-revoke execute on function public.register_shipment, public.answer_confirm, public.rate_order, public.find_order, public.found_orders from public, anon;
-grant execute on function public.register_shipment, public.answer_confirm, public.rate_order, public.find_order, public.found_orders to authenticated;
+-- 작업을 시작하기 전이면 취소를 요청한다. 반송·환불은 운영자가 처리한 뒤 상태를 '취소'로 바꾼다
+create function public.request_cancel(p_order_id text, p_reason text default null) returns void
+language plpgsql security definer set search_path = ''
+as $$
+begin
+  if length(coalesce(p_reason, '')) > 500 then
+    raise exception '사유는 500자까지 적어 주세요';
+  end if;
+  update public.orders
+     set cancel_requested_at = now(), cancel_reason = nullif(trim(p_reason), '')
+   where id = p_order_id and cancel_requested_at is null
+     and status in ('AWAITING_SHIPMENT', 'INBOUND_TRANSIT', 'INSPECTING', 'AWAITING_APPROVAL')
+     and (user_id = (select auth.uid()) or id in (select order_id from public.found_orders()));
+  if not found then
+    raise exception '취소를 요청할 수 없는 주문이에요';
+  end if;
+end $$;
+
+revoke execute on function public.register_shipment, public.answer_confirm, public.rate_order, public.request_cancel, public.find_order, public.found_orders from public, anon;
+grant execute on function public.register_shipment, public.answer_confirm, public.rate_order, public.request_cancel, public.find_order, public.found_orders to authenticated;
 
 -- 사진 보관함 (비공개). 경로 첫 칸이 주인의 user id다 --------------------
 insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)

@@ -13,7 +13,7 @@ import { garmentFromSample } from "@/lib/factory";
 import { csv, cx, won, nowMs } from "@/lib/format";
 import { CATEGORY_LABEL, MATERIAL_LABEL, PLACEMENT_LABEL } from "@/lib/garments";
 import { preparePhoto } from "@/lib/image";
-import { CARRIERS, contactMessage, maskName, nextStatus, STATUS_LABEL } from "@/lib/orders";
+import { CANCELLABLE, CARRIERS, contactMessage, maskName, nextStatus, STATUS_LABEL } from "@/lib/orders";
 import { downloadDataUrl } from "@/lib/render";
 import { dispatch, useIsClient, useStore, type State } from "@/lib/store";
 import type { Garment, MockupOptions, Order, OrderStatus } from "@/lib/types";
@@ -44,7 +44,11 @@ const COLUMNS: { key: string; title: string; statuses: OrderStatus[] }[] = [
   { key: "approval", title: "고객 승인 대기", statuses: ["AWAITING_APPROVAL"] },
   { key: "work", title: "작업", statuses: ["IN_PROGRESS"] },
   { key: "out", title: "출고·완료", statuses: ["OUTBOUND_TRANSIT", "DELIVERED"] },
+  { key: "cancel", title: "취소", statuses: ["CANCELLED"] },
 ];
+
+// 운영자는 작업 중에도 취소할 수 있다(검수 불가·파손 등). 손님은 작업 시작 전까지만 요청한다
+const ADMIN_CANCELLABLE: OrderStatus[] = [...CANCELLABLE, "IN_PROGRESS"];
 
 const ACTION: Partial<Record<OrderStatus, string>> = {
   INBOUND_TRANSIT: "입고 처리",
@@ -185,6 +189,8 @@ export default function AdminBoard() {
   const [admin, setAdmin] = useState<boolean | null>(null);
   const [server, setServer] = useState<State | null>(null);
   const [form, setForm] = useState(EMPTY_FORM);
+  const [measure, setMeasure] = useState({ chest: "", anchor: "" });
+  const [cancelling, setCancelling] = useState(false);
   const [busy, setBusy] = useState(false);
 
   const reload = useCallback(() => pullAll().then(setServer).catch(() => setToast("주문을 불러오지 못했어요")), []);
@@ -208,7 +214,7 @@ export default function AdminBoard() {
     : [...(isClient ? liveItems(store) : []), ...seedItems(seedStatus)];
   const selected = items.find((i) => i.key === selectedKey) ?? null;
   const selectedOrder = selected?.order;
-  const active = items.filter((i) => i.status !== "DELIVERED").length;
+  const active = items.filter((i) => i.status !== "DELIVERED" && i.status !== "CANCELLED").length;
 
   const flash = (message: string) => {
     setToast(message);
@@ -216,8 +222,11 @@ export default function AdminBoard() {
   };
 
   const select = (key: string | null) => {
+    const saved = items.find((i) => i.key === key)?.order?.measurements;
     setSelectedKey(key);
     setForm(EMPTY_FORM);
+    setMeasure({ chest: saved?.chest?.toString() ?? "", anchor: saved?.anchor?.toString() ?? "" });
+    setCancelling(false);
   };
 
   const download = () =>
@@ -235,6 +244,28 @@ export default function AdminBoard() {
     } catch {
       flash("복사하지 못했어요. 문구를 직접 선택해 복사해 주세요");
     }
+  };
+
+  /** 입고 검수 실측값을 주문에 남긴다. 빈칸은 저장하지 않는다 */
+  const saveMeasure = async (item: BoardItem) => {
+    if (!item.orderId) return;
+    const toCm = (s: string) => (s.trim() ? Number(s) : undefined);
+    const measurements = { chest: toCm(measure.chest), anchor: toCm(measure.anchor) };
+    if (Object.values(measurements).some((v) => v !== undefined && !(v > 0 && v < 300))) {
+      return flash("실측값은 0~300cm 사이 숫자로 넣어 주세요");
+    }
+    if (backendOn) {
+      setBusy(true);
+      try {
+        await updateOrder(item.orderId, { measurements });
+        await reload();
+      } catch (e) {
+        return flash(e instanceof Error ? e.message : "실측값을 저장하지 못했어요");
+      } finally {
+        setBusy(false);
+      }
+    } else dispatch({ type: "order/update", id: item.orderId, patch: { measurements } });
+    flash("실측값을 저장했어요");
   };
 
   const advance = async (item: BoardItem, to: OrderStatus, patch: Record<string, unknown> = {}) => {
@@ -382,6 +413,7 @@ export default function AdminBoard() {
                             <Badge tone={item.due.startsWith("D-") && Number(item.due.slice(2)) <= 2 ? "warn" : "neutral"}>{item.due}</Badge>
                             {item.live ? <Badge tone="accent">새 주문</Badge> : null}
                             {item.status === "DELIVERED" ? <Badge tone="ok">완료</Badge> : null}
+                            {item.order?.cancelRequestedAt && item.status !== "CANCELLED" ? <Badge tone="warn">취소 요청</Badge> : null}
                           </div>
                         </div>
                       </button>
@@ -475,6 +507,12 @@ export default function AdminBoard() {
                     <dd className="font-semibold text-accent">{selected.adjustNote}</dd>
                   </>
                 ) : null}
+                {selectedOrder?.cancelRequestedAt ? (
+                  <>
+                    <dt className="text-muted">취소 요청</dt>
+                    <dd className="font-semibold text-[#c2412d]">{selectedOrder.cancelReason ?? "사유는 적지 않았어요"}</dd>
+                  </>
+                ) : null}
               </dl>
               {selectedOrder ? (
                 <div>
@@ -500,12 +538,30 @@ export default function AdminBoard() {
                 </ol>
               </div>
               <div>
-                <div className="text-[13.5px] font-bold">입고 검수 실측</div>
+                <div className="flex items-center justify-between">
+                  <div className="text-[13.5px] font-bold">입고 검수 실측</div>
+                  {selectedOrder ? (
+                    <Button variant="secondary" size="sm" disabled={busy} onClick={() => saveMeasure(selected)}>
+                      실측 저장
+                    </Button>
+                  ) : null}
+                </div>
                 <div className="mt-2 grid grid-cols-2 gap-2">
-                  {["가슴 단면 (cm)", "기준점 거리 (cm)"].map((label) => (
-                    <label key={label} className="block text-[12px] text-muted">
+                  {(
+                    [
+                      ["chest", "가슴 단면 (cm)"],
+                      ["anchor", "기준점 거리 (cm)"],
+                    ] as const
+                  ).map(([key, label]) => (
+                    <label key={key} className="block text-[12px] text-muted">
                       {label}
-                      <input inputMode="decimal" placeholder="0.0" className="mt-1 h-10 w-full rounded-lg border border-line px-3 text-[14px] text-ink outline-none focus:border-ink" />
+                      <input
+                        inputMode="decimal"
+                        placeholder="0.0"
+                        value={measure[key]}
+                        onChange={(e) => setMeasure({ ...measure, [key]: e.target.value.replace(/[^0-9.]/g, "") })}
+                        className="mt-1 h-10 w-full rounded-lg border border-line px-3 text-[14px] text-ink outline-none focus:border-ink"
+                      />
                     </label>
                   ))}
                 </div>
@@ -585,9 +641,37 @@ export default function AdminBoard() {
                     </Button>
                   ) : null}
                 </div>
+              ) : selected.status === "CANCELLED" ? (
+                <p className="text-center text-[13px] text-muted">취소된 주문이에요</p>
               ) : (
                 <p className="text-center text-[13px] text-muted">완료된 주문이에요</p>
               )}
+              {ADMIN_CANCELLABLE.includes(selected.status) ? (
+                cancelling ? (
+                  <div className="mt-3 rounded-xl bg-[#fbeee9] p-3 text-[13px]">
+                    <p className="font-semibold">반송과 환불을 마쳤나요? 취소한 주문은 화면에서 되돌릴 수 없어요.</p>
+                    <div className="mt-2 grid grid-cols-2 gap-2">
+                      <Button variant="secondary" size="sm" onClick={() => setCancelling(false)}>
+                        아니요
+                      </Button>
+                      <Button
+                        size="sm"
+                        disabled={busy}
+                        onClick={() => {
+                          setCancelling(false);
+                          void advance(selected, "CANCELLED");
+                        }}
+                      >
+                        주문 취소 처리
+                      </Button>
+                    </div>
+                  </div>
+                ) : (
+                  <button type="button" onClick={() => setCancelling(true)} className="mt-3 w-full text-center text-[13px] font-semibold text-[#c2412d] hover:underline">
+                    주문 취소 처리…
+                  </button>
+                )
+              ) : null}
               {selected.live && selected.orderId ? (
                 <Link href={`/orders/${selected.orderId}`} target="_blank" className="mt-3 flex items-center justify-center gap-1 text-[13px] font-semibold text-muted hover:text-ink">
                   고객이 보는 화면 열기 <ExternalLink size={13} />

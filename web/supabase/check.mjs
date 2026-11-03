@@ -148,4 +148,21 @@ await db.exec("set role anon");
 await assert.rejects(() => db.query("select public.find_order('R2611030001', '01012345678')"), "로그인 안 한 사람은 찾기를 못 쓴다");
 await db.exec("reset role");
 
+// 작업 시작 전에는 손님이 취소를 요청하고, 운영자가 반송·환불을 마친 뒤 '취소'로 바꾼다
+await fails(B, "select public.request_cancel('o2', '마음이 바뀌었어요')", [], "남의 주문은 취소 요청 못 한다");
+await fails(A, "select public.request_cancel('o1')", [], "받은 주문은 취소 요청 못 한다");
+await as(D, "select public.request_cancel('o2', '  마음이 바뀌었어요  ')");
+const [asked] = await rows(A, "select cancel_requested_at is not null as asked, cancel_reason from public.orders where id = 'o2'");
+assert.deepEqual([asked.asked, asked.cancel_reason], [true, "마음이 바뀌었어요"], "찾은 브라우저에서 요청하면 원래 브라우저도 본다");
+await fails(A, "select public.request_cancel('o2')", [], "두 번 요청은 막는다");
+assert.equal((await as(A, "update public.orders set status = 'CANCELLED' where id = 'o2'")).affectedRows, 0, "손님은 직접 취소하지 못한다");
+await as(ADMIN, `update public.orders set status = 'CANCELLED', measurements = '{"chest": 52.5}' where id = 'o2'`);
+assert.equal(
+  (await rows(null, "select status from public.order_events where order_id = 'o2' order by id desc limit 1"))[0].status,
+  "CANCELLED",
+  "취소도 상태 기록에 남는다",
+);
+await fails(D, "select public.register_shipment('o2', 'CJ대한통운', '123456789012')", [], "취소된 주문은 더 진행하지 못한다");
+await fails(ADMIN, "update public.orders set status = 'LOST' where id = 'o2'", [], "정해진 상태만 쓴다");
+
 console.log("schema.sql 규칙 검사 통과");

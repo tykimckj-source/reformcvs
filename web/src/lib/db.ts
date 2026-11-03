@@ -43,6 +43,9 @@ export interface OrderRow {
   confirm_note: string | null;
   adjust_note: string | null;
   rating: number | null;
+  measurements: Order["measurements"] | null;
+  cancel_requested_at: string | null;
+  cancel_reason: string | null;
   created_at: string;
   order_events: { status: OrderStatus; at: string }[];
 }
@@ -66,6 +69,9 @@ export function toOrder(r: OrderRow, photos = new Map<string, string>()): Order 
     confirmNote: r.confirm_note ?? undefined,
     adjustNote: r.adjust_note ?? undefined,
     rating: r.rating ?? undefined,
+    measurements: r.measurements ?? undefined,
+    cancelRequestedAt: r.cancel_requested_at ? Date.parse(r.cancel_requested_at) : undefined,
+    cancelReason: r.cancel_reason ?? undefined,
     createdAt: Date.parse(r.created_at),
   };
 }
@@ -251,6 +257,7 @@ export const shipOrder = (id: string, carrier: string, number: string) =>
 export const answerConfirm = (id: string, approve: boolean, note?: string) =>
   call("answer_confirm", { p_order_id: id, p_approve: approve, p_note: note ?? null });
 export const rateOrder = (id: string, rating: number) => call("rate_order", { p_order_id: id, p_rating: rating });
+export const requestCancel = (id: string, reason: string) => call("request_cancel", { p_order_id: id, p_reason: reason });
 
 /** 다른 브라우저에서 한 주문을 주문번호와 연락처로 찾아 이 브라우저 계정에도 연다. 못 찾으면 null */
 export async function findOrder(orderNo: string, phone: string): Promise<string | null> {
