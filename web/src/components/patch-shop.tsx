@@ -1,9 +1,13 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState, useSyncExternalStore } from "react";
+import Link from "next/link";
+import { PatchManager } from "./patch-manager";
+import viewports from "@/data/patch-viewports.json";
+import publishedCatalog from "@/data/patch-catalog.json";
 
-type Product = { id: string; name: string; category: "눈 모양" | "장식 패치" | "전사지"; box: [number, number, number, number]; back?: boolean };
-const products: Product[] = [
+export type Product = { id: string; name: string; category: "눈 모양" | "장식 패치" | "전사지"; box: [number, number, number, number]; back?: boolean; image?: string; cost?: number };
+const baseProducts: Product[] = [
   { id: "eyes-lash", name: "속눈썹 눈 모양", category: "눈 모양", box: [125, 200, 190, 186] },
   { id: "eyes-up", name: "위쪽을 보는 눈", category: "눈 모양", box: [681, 167, 213, 151] },
   { id: "eyes-round", name: "동그란 눈", category: "눈 모양", box: [794, 456, 183, 154] },
@@ -29,19 +33,46 @@ const products: Product[] = [
   { id: "green-car", name: "초록 자동차", category: "장식 패치", box: [707, 1167, 218, 186] },
   { id: "sewing", name: "I’M OK 재봉 도구", category: "전사지", box: [265, 512, 535, 510], back: true },
 ];
-const price = (p: Product) => p.back ? 3000 : 1000;
+const price = (p: Product) => p.cost ?? (p.back ? 3000 : 1000);
 const won = (n: number) => `${n.toLocaleString("ko-KR")}원`;
 
+const catalogKey = "reformcvs-patch-catalog-v1";
+function subscribe(listener: () => void) {
+  window.addEventListener("storage", listener); window.addEventListener("patch-catalog-change", listener);
+  return () => { window.removeEventListener("storage", listener); window.removeEventListener("patch-catalog-change", listener); };
+}
+function snapshot() { try { return localStorage.getItem(catalogKey) || "[]"; } catch { return "[]"; } }
+function readProducts(raw: string): Product[] {
+  try {
+    const entries: unknown = JSON.parse(raw);
+    if (!Array.isArray(entries)) return [];
+    return entries.filter((p): p is Product => p && typeof p.id === "string" && typeof p.name === "string" && ["눈 모양", "장식 패치", "전사지"].includes(p.category) && Array.isArray(p.box) && p.box.length === 4 && p.box.every((n: unknown) => typeof n === "number" && Number.isFinite(n)) && p.box[2] > 0 && p.box[3] > 0 && Number.isInteger(p.cost) && p.cost >= 0 && p.cost <= 1000000 && (!p.image || /^data:image\/(png|jpeg|webp);base64,/.test(p.image)));
+  } catch { return []; }
+}
+
 function DetailImage({ product }: { product: Product }) {
-  const [x, y, width, height] = product.box;
-  return <div className="flex aspect-square items-center justify-center overflow-hidden rounded-xl bg-white p-4"><div className="relative overflow-hidden" style={{ width: `${Math.min(1, width / height) * 72}%`, maxWidth: width, aspectRatio: `${width} / ${height}` }}>
+  const viewport = (viewports as Record<string, { box: number[]; clip: string }>)[product.id];
+  const [x, y, width, height] = viewport?.box ?? product.box;
+  if (product.image) return <div className="flex aspect-square items-center justify-center rounded-xl bg-white p-6">
+    {/* eslint-disable-next-line @next/next/no-img-element */}
+    <img src={product.image} alt={product.name} className="h-full w-full object-contain" />
+  </div>;
+  return <div className="flex aspect-square items-center justify-center overflow-hidden rounded-xl bg-white p-4"><div className="relative overflow-hidden" style={{ width: `${Math.min(1, width / height) * 72}%`, maxWidth: width, aspectRatio: `${width} / ${height}`, clipPath: viewport?.clip }}>
     {/* Each product uses a transparent cutout sprite, displayed on white. */}
     {/* eslint-disable-next-line @next/next/no-img-element */}
     <img src={`/cases/gray-recut/patch-cutout-${product.back ? "back" : "front"}.png`} alt={product.name} loading="lazy" className="absolute max-w-none" style={{ width: `${1024 / width * 100}%`, left: `${-x / width * 100}%`, top: `${-y / height * 100}%` }} />
   </div></div>;
 }
 
-export function PatchShop() {
+export function PatchShop({ catalog = false, editor = false }: { catalog?: boolean; editor?: boolean }) {
+  const stored = useSyncExternalStore(subscribe, snapshot, () => "[]");
+  const custom = useMemo(() => {
+    const published = readProducts(JSON.stringify(publishedCatalog));
+    if (!editor) return published;
+    const drafts = readProducts(stored);
+    return [...published.filter(p => !drafts.some(d => d.id === p.id)), ...drafts];
+  }, [stored, editor]);
+  const products = useMemo(() => [...baseProducts.map(p => custom.find(c => c.id === p.id) || p), ...custom.filter(p => !baseProducts.some(b => b.id === p.id))], [custom]);
   const [filter, setFilter] = useState("전체");
   const [quantities, setQuantities] = useState<Record<string, number>>({});
   const [includeRecut, setIncludeRecut] = useState(false);
@@ -58,6 +89,14 @@ export function PatchShop() {
     <h2 id="patch-shop-title" className="mt-2 text-[23px] font-bold">사진 속 장식 골라 담기</h2>
     <p className="mt-3 text-sm leading-6 text-muted">눈 모양부터 컬러 패치, 뒷판 전사지까지. 원하는 디자인만 선택하고, 다른 패치를 함께 담아 나만의 조합을 만들어 보세요.</p>
     <p className="mt-2 text-xs leading-5 text-muted">사진을 바탕으로 배경을 제거한 참고 이미지입니다. 실제 크기·소재·재고·부착 방식은 판매 전 확인 예정입니다.</p>
+    {!catalog && <Link href="/patches" className="my-4 block rounded-xl border border-line bg-white px-4 py-3 text-sm font-semibold">패치 모음 · 선택·금액 계산 →</Link>}
+    {editor && <div className="mt-5"><PatchManager products={products} changes={custom} save={p => {
+      localStorage.setItem(catalogKey, JSON.stringify([...custom.filter(c => c.id !== p.id), p]));
+      window.dispatchEvent(new Event("patch-catalog-change")); setCart(null); setReview(false); setFilter("전체");
+    }} reset={id => {
+      localStorage.setItem(catalogKey, JSON.stringify(custom.filter(c => c.id !== id)));
+      window.dispatchEvent(new Event("patch-catalog-change")); setCart(null); setReview(false); setQuantities(q => ({ ...q, [id]: 0 }));
+    }} /></div>}
     <div aria-label="장식 종류" className="my-5 flex flex-wrap gap-2">{["전체", "눈 모양", "장식 패치", "전사지"].map(f => <button key={f} type="button" aria-pressed={filter === f} onClick={() => setFilter(f)} className={`min-h-10 rounded-full border px-3 text-xs font-semibold ${filter === f ? "border-[#293e32] bg-[#293e32] text-white" : "border-line bg-white"}`}>{f}</button>)}</div>
     <div className="grid grid-cols-2 gap-x-3 gap-y-5">{products.filter(p => filter === "전체" || p.category === filter).map(p => <article key={p.id}>
       <DetailImage product={p} />

@@ -65,7 +65,18 @@ export default function Landing() {
         </Link>
       </section>
 
-      <div className="px-5">
+        <div className="px-5">
+          <Link href="/cases/denim-skirt" className="mt-3 flex items-center gap-4 rounded-[20px] border border-line bg-white p-3">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/cases/denim-skirt/after-front.png" alt="바지 두 벌을 재구성한 긴 청치마" className="h-24 w-24 rounded-xl object-contain" />
+            <div className="flex-1"><p className="text-[11px] font-bold text-[#53634b]">해체와 재구성 리폼</p><p className="mt-1 text-[15px] font-semibold">바지 두 벌,<br />하나의 청치마</p><p className="mt-2 text-xs text-muted">앞면·뒷면과 디테일 보기 →</p></div>
+          </Link>
+          <Link href="/cases/white-stamp" className="mt-3 flex items-center gap-4 rounded-[20px] border border-line bg-white p-3">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/cases/white-stamp/after-front.png" alt="나비와 꽃 스탬프·스텐실로 리폼한 흰색 남방" className="h-24 w-24 rounded-xl object-contain" />
+            <div className="flex-1"><p className="text-[11px] font-bold text-[#53634b]">스탬프와 스텐실 리폼</p><p className="mt-1 text-[15px] font-semibold">흰색 남방에 피어난<br />나비와 꽃</p><p className="mt-2 text-xs text-muted">앞면·뒷면 비포 애프터 보기 →</p></div>
+          </Link>
+          <Link href="/patches" className="mt-5 block rounded-xl border border-line bg-white px-4 py-4 text-sm font-semibold">패치 모음 · 원하는 장식 고르고 금액 계산하기 →</Link>
         <Link href="/cases/gray-recut" className="mt-3 flex items-center gap-4 rounded-[20px] border border-line bg-white p-3">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src="/cases/gray-recut/after-front.png" alt="소매를 재단해 폭을 넓힌 회색 티" className="h-24 w-24 rounded-xl object-contain" />

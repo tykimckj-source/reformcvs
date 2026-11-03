@@ -140,6 +140,7 @@ export default function AdminBoard() {
             ))}
           </nav>
           <div className="ml-auto flex items-center gap-3">
+            {process.env.NODE_ENV === "development" && <Link href="/admin/patches" className="text-sm font-semibold underline">패치 상품 편집</Link>}
             <Bell size={18} className="text-muted" />
             <Link href="/" className="inline-flex items-center gap-1 text-[13px] font-semibold text-muted hover:text-ink">
               고객 화면 <ExternalLink size={13} />
