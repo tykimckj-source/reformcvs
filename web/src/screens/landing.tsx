@@ -11,7 +11,8 @@ import { DESIGNS } from "@/lib/designs";
 import { garmentFromSample } from "@/lib/factory";
 import { won } from "@/lib/format";
 import { SAMPLE_GARMENTS } from "@/lib/garments";
-import { dispatch } from "@/lib/store";
+import { STATUS_LABEL } from "@/lib/orders";
+import { dispatch, useStore } from "@/lib/store";
 
 const hero = garmentFromSample("denim-jacket", "hero", 0, true);
 const heroLayers = [
@@ -41,6 +42,8 @@ const FABRICS = ["#3e5f8a", "#f1efe9", "#a8aaad", "#2a2b30", "#d6c2a0", "#6e6c46
 
 export default function Landing() {
   const [toast, setToast] = useState<string | null>(null);
+  const { orders } = useStore();
+  const mine = Object.values(orders).sort((a, b) => b.createdAt - a.createdAt)[0];
 
   const resetDemo = async () => {
     if (backendOn) await forgetMe();
@@ -86,6 +89,22 @@ export default function Landing() {
         <LinkButton href="/capture#samples" variant="secondary">
           샘플 옷으로 체험하기
         </LinkButton>
+        {mine ? (
+          <Link
+            href={`/orders/${mine.id}`}
+            className="flex items-center justify-between rounded-2xl border border-line bg-white px-4 py-3 text-[14px]"
+          >
+            <span>
+              <b>내 주문</b> <span className="text-muted">{mine.orderNo}</span>
+            </span>
+            <span className="flex items-center gap-0.5 font-semibold">
+              {STATUS_LABEL[mine.status]} <ChevronRight size={16} />
+            </span>
+          </Link>
+        ) : null}
+        <Link href="/orders/find" className="pt-1 text-center text-[13.5px] font-semibold text-muted underline underline-offset-4 hover:text-ink">
+          다른 기기에서 주문하셨나요? 주문번호로 찾기
+        </Link>
       </section>
 
       <section className="px-5 pt-12">

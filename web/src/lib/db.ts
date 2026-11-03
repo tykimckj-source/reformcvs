@@ -252,6 +252,14 @@ export const answerConfirm = (id: string, approve: boolean, note?: string) =>
   call("answer_confirm", { p_order_id: id, p_approve: approve, p_note: note ?? null });
 export const rateOrder = (id: string, rating: number) => call("rate_order", { p_order_id: id, p_rating: rating });
 
+/** 다른 브라우저에서 한 주문을 주문번호와 연락처로 찾아 이 브라우저 계정에도 연다. 못 찾으면 null */
+export async function findOrder(orderNo: string, phone: string): Promise<string | null> {
+  await customerId();
+  const { data, error } = await customerDb().rpc("find_order", { p_order_no: orderNo, p_phone: phone });
+  if (error) throw new Error(error.message);
+  return (data as string | null) ?? null;
+}
+
 // 운영 콘솔 ----------------------------------------------------------------
 
 export async function isAdmin() {

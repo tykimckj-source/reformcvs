@@ -14,6 +14,7 @@ import { PLACEMENT_LABEL } from "@/lib/garments";
 import { CARRIERS, nextStatus, ORDER_STEPS, stepIndex, WORKSHOP_ADDRESS } from "@/lib/orders";
 import { dispatch, useIsClient, useStore } from "@/lib/store";
 import type { OrderStatus } from "@/lib/types";
+import FindOrderScreen from "@/screens/find-order";
 
 export default function OrderScreen() {
   const { orderId } = useParams<{ orderId: string }>();
@@ -37,7 +38,8 @@ export default function OrderScreen() {
   const design = session ? designBySlug(session.designSlug) : undefined;
 
   if (!isClient) return <ScreenSkeleton />;
-  if (!order || !session || !garment || !design) return <Missing what="주문" />;
+  // 서버 모드에서는 다른 브라우저에서 한 주문일 수 있으니 주문번호·연락처로 찾게 한다
+  if (!order || !session || !garment || !design) return backendOn ? <FindOrderScreen lost /> : <Missing what="주문" />;
 
   const o = session.options;
   const current = stepIndex(order.status);
@@ -105,6 +107,9 @@ export default function OrderScreen() {
             <div className="mt-1 font-semibold">{won(order.total)} 결제</div>
           </div>
         </Card>
+        {backendOn ? (
+          <p className="mt-2 px-1 text-[12.5px] text-muted">주문번호와 연락처만 있으면 다른 기기에서도 이 주문을 찾을 수 있어요.</p>
+        ) : null}
       </section>
 
       <section className="px-5 pt-3">

@@ -105,4 +105,47 @@ assert.equal((await rows(B, "select name from storage.objects")).length, 0, "B�
 await as(ADMIN, "insert into storage.objects (bucket_id, name) values ('photos', $1)", [`${A}/orders/o1.jpg`]);
 assert.equal((await rows(A, "select name from storage.objects")).length, 2, "A는 관리자가 올린 확정 사진도 본다");
 
+// 다른 브라우저(새 익명 계정 D)에서 주문번호·연락처로 A의 주문 o2를 찾는다
+const [D, E] = ["d", "e"].map((c) => `${c.repeat(8)}-0000-4000-8000-000000000000`);
+for (const id of [D, E]) await db.query("insert into auth.users (id) values ($1)", [id]);
+await as(A, "insert into public.garments (id, photo_path, data) values ('g2', $1, '{}')", [`${A}/g2.jpg`]);
+await as(A, "insert into public.mockup_sessions (id, garment_id, data) values ('s2', 'g2', '{}')");
+await as(A, "insert into public.quotes (id, session_id, data) values ('q2', 's2', '{}')");
+await as(null, `insert into public.orders (id, order_no, user_id, quote_id, session_id, total, customer, consents)
+                values ('o2', 'R2611030001', $1, 'q2', 's2', 28500, '{"phone": "010-1234-5678"}', '{}')`, [A]);
+await as(A, "insert into storage.objects (bucket_id, name) values ('photos', $1)", [`${A}/g2.jpg`]);
+await as(ADMIN, "insert into storage.objects (bucket_id, name) values ('photos', $1)", [`${A}/orders/o2.jpg`]);
+await as(ADMIN, "update public.orders set confirm_photo_path = $1 where id = 'o2'", [`${A}/orders/o2.jpg`]);
+const find = async (uid, no, phone) => (await as(uid, "select public.find_order($1, $2) as id", [no, phone])).rows[0].id;
+const ids = async (uid, table) => (await rows(uid, `select id from ${table} order by id`)).map((r) => r.id);
+
+assert.equal(await find(D, "R2611030001", "010-9999-9999"), null, "연락처가 다르면 못 찾는다");
+assert.deepEqual(await ids(D, "public.orders"), [], "찾기 전에는 주문을 못 본다");
+assert.equal(await find(D, " r2611030001 ", "01012345678"), "o2", "주문번호 대소문자·공백과 연락처 하이픈은 따지지 않는다");
+assert.deepEqual(await ids(D, "public.orders"), ["o2"], "찾은 주문만 본다");
+assert.deepEqual(await ids(D, "public.mockup_sessions"), ["s2"], "찾은 주문의 시안을 본다");
+assert.deepEqual(await ids(D, "public.garments"), ["g2"], "찾은 주문의 옷만 본다");
+assert.deepEqual(await ids(D, "public.quotes"), [], "견적은 열지 않는다");
+assert.deepEqual(
+  (await rows(D, "select name from storage.objects order by name")).map((r) => r.name),
+  [`${A}/g2.jpg`, `${A}/orders/o2.jpg`],
+  "찾은 주문의 옷 사진과 확정 사진만 본다",
+);
+assert.equal((await rows(D, "select * from public.order_access")).length, 0, "열람 기록 표는 직접 못 읽는다");
+assert.equal((await as(D, "update public.orders set status = 'DELIVERED'")).affectedRows, 0, "찾아도 상태를 직접 못 바꾼다");
+await as(D, "select public.register_shipment('o2', 'CJ대한통운', '123456789012')");
+assert.equal((await rows(null, "select status from public.orders where id = 'o2'"))[0].status, "INBOUND_TRANSIT", "찾은 브라우저에서 발송 등록한다");
+assert.equal((await rows(D, "select id from public.order_events")).length, 2, "찾은 주문의 상태 기록을 본다");
+assert.deepEqual(await ids(A, "public.orders"), ["o1", "o2"], "원래 브라우저도 그대로 본다");
+assert.deepEqual(await ids(B, "public.orders"), [], "찾지 않은 사람은 여전히 못 본다");
+
+// 주문번호를 하나씩 넣어 보는 것을 막는다
+for (let i = 0; i < 10; i++) assert.equal(await find(B, `R261103000${i}9`, "010-5555-0000"), null);
+await fails(B, "select public.find_order($1, $2)", ["R2611030001", "010-1234-5678"], "하루 10번 틀린 계정은 맞는 번호도 막는다");
+await fails(E, "select public.find_order($1, $2)", ["R2611030001", "010-5555-0000"], "10번 틀린 연락처는 다른 계정에서도 막는다");
+assert.equal(await find(E, "R2611030001", "010-1234-5678"), "o2", "다른 연락처로는 그대로 찾는다");
+await db.exec("set role anon");
+await assert.rejects(() => db.query("select public.find_order('R2611030001', '01012345678')"), "로그인 안 한 사람은 찾기를 못 쓴다");
+await db.exec("reset role");
+
 console.log("schema.sql 규칙 검사 통과");

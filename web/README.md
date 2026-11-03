@@ -34,6 +34,7 @@ npm run start
 | `/m/[sessionId]` | 시안 만들기: 위치·크기·색, 끌어서 옮기기, 원본 비교, 크게 보기, AI 후보, 저장 | C-09–C-13, C-23 |
 | `/checkout/[quoteId]` | 견적·로그인·동의·결제 | C-03, C-14, C-15 |
 | `/orders/[orderId]` | 발송 등록, 진행 추적, 확정 시안 승인, 평가 | C-16–C-19, C-24 |
+| `/orders/find` | 내 주문 찾기 (주문번호 + 연락처) | 추가 |
 | `/admin` | 운영 콘솔 주문 보드와 작업지시서 | A-02–A-09 일부 |
 
 ## 실제로 동작하는 것과 흉내만 내는 것
@@ -51,6 +52,7 @@ npm run start
 - 손님 체험 기록(사진·옷·시안·견적)을 익명 계정으로 저장한다. 사진은 비공개 보관함에 둔다.
 - 주문은 서버(`src/app/api/orders`)가 디자인 가격표로 금액을 다시 계산해 만든다.
 - 발송 등록, 확정 시안 승인·조정 요청, 별점은 데이터베이스 함수가 순서를 지키며 바꾼다.
+- 손님 계정은 브라우저마다 따로 생긴다. 다른 브라우저나 기기에서는 주문번호와 연락처로 자기 주문을 찾아 이어서 본다(`/orders/find`). 틀린 시도는 같은 연락처나 계정마다 하루 10번까지다.
 - 운영 콘솔은 이메일로 로그인하고, 모든 주문을 실시간으로 본다. 확정 사진을 올리고 출고 송장을 넣는다.
 
 아직 없는 것: 카카오 로그인, 실제 결제, 알림톡, AI 인식·시안 생성.
@@ -60,7 +62,7 @@ npm run start
 ### 연결하는 법
 
 1. supabase.com에서 프로젝트를 만든다. 지역은 Northeast Asia (Seoul).
-2. SQL Editor에 `supabase/schema.sql`을 통째로 붙여 넣고 실행한다.
+2. SQL Editor에 `supabase/schema.sql`을 통째로 붙여 넣고 실행한다. 예전 schema.sql을 이미 실행한 프로젝트는 대신 `supabase/patch-find-order.sql`만 한 번 실행한다.
 3. Authentication → Sign In / Providers에서 **Allow anonymous sign-ins**를 켠다.
 4. Authentication → Users → Add user로 관리자 계정(이메일·비밀번호, Auto Confirm)을 만든다. 그다음 SQL Editor에서 관리자로 등록한다.
 
