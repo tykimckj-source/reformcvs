@@ -7,7 +7,7 @@ import { useEffect, useState } from "react";
 import { Missing, PhoneFrame, ScreenSkeleton, TopBar } from "@/components/app-frame";
 import { MockupStage } from "@/components/mockup-stage";
 import { Button, Card, DemoTag, Toast } from "@/components/ui";
-import { answerConfirm, backendOn, rateOrder, requestCancel, shipOrder } from "@/lib/db";
+import { answerConfirm, backendOn, rateOrder, requestCancel, shipOrder, withdrawLearning } from "@/lib/db";
 import { colorOf, designBySlug } from "@/lib/designs";
 import { cx, timeLabel, won, nowMs } from "@/lib/format";
 import { PLACEMENT_LABEL } from "@/lib/garments";
@@ -27,6 +27,7 @@ export default function OrderScreen() {
   const [toast, setToast] = useState<string | null>(null);
   const [cancelOpen, setCancelOpen] = useState(false);
   const [cancelReason, setCancelReason] = useState("");
+  const [withdrawing, setWithdrawing] = useState(false);
 
   useEffect(() => {
     if (!toast) return;
@@ -384,6 +385,40 @@ export default function OrderScreen() {
           })}
         </ol>
       </section>
+
+      {backendOn && order.learnConsent ? (
+        <section className="px-5 pt-5">
+          {withdrawing ? (
+            <div className="rounded-2xl border border-line bg-white p-4 text-[13.5px] leading-relaxed">
+              <p>완성 전·후 사진을 디자인 품질 개선(AI 학습)에 쓰지 않도록 동의를 철회할까요?</p>
+              <div className="mt-2 grid grid-cols-2 gap-2">
+                <Button variant="secondary" size="md" onClick={() => setWithdrawing(false)}>
+                  닫기
+                </Button>
+                <Button
+                  size="md"
+                  onClick={() =>
+                    act(
+                      () => withdrawLearning(order.id),
+                      () => {
+                        dispatch({ type: "order/update", id: order.id, patch: { learnConsent: false } });
+                        setWithdrawing(false);
+                      },
+                      "AI 학습 활용 동의를 철회했어요. 이 주문의 사진은 학습에 쓰지 않아요.",
+                    )
+                  }
+                >
+                  동의 철회
+                </Button>
+              </div>
+            </div>
+          ) : (
+            <button type="button" onClick={() => setWithdrawing(true)} className="w-full text-center text-[13px] font-semibold text-muted underline underline-offset-4">
+              AI 학습 활용 동의 철회
+            </button>
+          )}
+        </section>
+      ) : null}
 
       {/* 서버가 붙으면 다음 단계는 운영 콘솔에서만 넘긴다 */}
       <section className={cx("px-5 pb-10 pt-6", backendOn && "hidden")}>

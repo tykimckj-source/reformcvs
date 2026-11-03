@@ -49,10 +49,18 @@ export default function Landing() {
     .sort((a, b) => (b.doneAt ?? 0) - (a.doneAt ?? 0))[0];
 
   const resetDemo = async () => {
-    if (backendOn) await forgetMe();
+    const flash = (message: string) => {
+      setToast(message);
+      window.setTimeout(() => setToast(null), 3000);
+    };
+    const hadOrders = Object.keys(orders).length > 0;
+    try {
+      if (backendOn) await forgetMe();
+    } catch (e) {
+      return flash(e instanceof Error ? e.message : "기록을 지우지 못했어요");
+    }
     dispatch({ type: "reset" });
-    setToast("체험 기록을 모두 지웠어요");
-    window.setTimeout(() => setToast(null), 2400);
+    flash(backendOn && hadOrders ? "체험 기록을 지웠어요. 주문은 법에 따라 보관되고, 주문번호와 연락처로 다시 찾을 수 있어요" : "체험 기록을 모두 지웠어요");
   };
 
   return (
@@ -181,7 +189,9 @@ export default function Landing() {
 
       <footer className="mt-auto px-5 pb-10 pt-12 text-[12px] leading-relaxed text-muted">
         <p>
-          이 화면은 프론트엔드 시안입니다. AI 생성, 결제, 배송 조회는 아직 연결하지 않았고, 체험 기록은 이 브라우저에만 저장돼요.
+          {backendOn
+            ? "AI 생성, 결제, 배송 조회는 아직 연결하지 않았어요. ‘체험 기록 지우기’를 누르면 이 브라우저의 기록과 함께, 주문에 쓰이지 않은 옷 사진과 시안을 서버에서도 지워요."
+            : "이 화면은 프론트엔드 시안입니다. AI 생성, 결제, 배송 조회는 아직 연결하지 않았고, 체험 기록은 이 브라우저에만 저장돼요."}
         </p>
         <button type="button" onClick={resetDemo} className="mt-3 font-semibold text-ink underline underline-offset-4">
           체험 기록 지우기

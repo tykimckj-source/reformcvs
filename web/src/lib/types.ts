@@ -103,6 +103,8 @@ export interface Order {
   /** 손님이 취소를 요청한 때와 사유. 반송·환불은 운영자가 처리하고 상태를 CANCELLED로 바꾼다 */
   cancelRequestedAt?: number;
   cancelReason?: string;
+  /** 완성 전·후 사진을 AI 학습에 써도 된다는 선택 동의. 주문 화면에서 철회할 수 있다 */
+  learnConsent?: boolean;
   /** 서버 주문의 주인. 운영 콘솔이 사진을 손님 폴더에 올릴 때 쓴다 */
   userId?: string;
   createdAt: number;

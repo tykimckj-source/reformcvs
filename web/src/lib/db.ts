@@ -47,6 +47,7 @@ export interface OrderRow {
   measurements: Order["measurements"] | null;
   cancel_requested_at: string | null;
   cancel_reason: string | null;
+  consents: { learn?: boolean } | null;
   created_at: string;
   order_events: { status: OrderStatus; at: string }[];
 }
@@ -73,6 +74,7 @@ export function toOrder(r: OrderRow, photos = new Map<string, string>()): Order 
     measurements: r.measurements ?? undefined,
     cancelRequestedAt: r.cancel_requested_at ? Date.parse(r.cancel_requested_at) : undefined,
     cancelReason: r.cancel_reason ?? undefined,
+    learnConsent: r.consents?.learn === true,
     createdAt: Date.parse(r.created_at),
   };
 }
@@ -242,11 +244,23 @@ export function watchMine(onChange: () => void) {
   unwatchMine = () => void db.removeChannel(channel);
 }
 
-/** 체험 기록 지우기: 이 브라우저의 익명 계정에서 나간다 */
+/**
+ * 체험 기록 지우기: 주문에 쓰이지 않은 내 기록과 사진을 서버에서 지우고, 이 브라우저의 익명 계정에서 나간다.
+ * 주문과 그 주문의 옷·시안은 법정 보관 기간 동안 남는다.
+ */
 export async function forgetMe() {
   unwatchMine?.();
   unwatchMine = undefined;
-  await customerDb().auth.signOut();
+  const db = customerDb();
+  const { data } = await db.auth.getSession();
+  if (data.session) {
+    // 밀린 저장이 지운 뒤에 다시 적히지 않게 먼저 보낸다
+    await flush();
+    const { data: paths, error } = await db.rpc("forget_my_trials");
+    if (error) throw new Error("서버 기록을 지우지 못했어요. 다시 시도해 주세요");
+    if ((paths as string[]).length) check(await db.storage.from(BUCKET).remove(paths as string[]));
+  }
+  await db.auth.signOut();
 }
 
 /** 주문을 만든다. 금액은 서버가 디자인 가격표로 다시 계산한다. */
@@ -289,6 +303,7 @@ export const answerConfirm = (id: string, approve: boolean, note?: string) =>
   call("answer_confirm", { p_order_id: id, p_approve: approve, p_note: note ?? null });
 export const rateOrder = (id: string, rating: number) => call("rate_order", { p_order_id: id, p_rating: rating });
 export const requestCancel = (id: string, reason: string) => call("request_cancel", { p_order_id: id, p_reason: reason });
+export const withdrawLearning = (id: string) => call("withdraw_learning", { p_order_id: id });
 
 /** 디자이너에게 이 시안을 직접 만들어 달라고 요청한다. 디자이너가 옷 사진을 봐야 하니 옷과 시안을 서버에 확실히 적은 뒤 남긴다 */
 export async function requestManual(garment: Garment, session: MockupSession, note: string, phone: string) {

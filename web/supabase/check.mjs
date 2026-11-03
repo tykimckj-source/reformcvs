@@ -176,4 +176,33 @@ await as(ADMIN, "update public.manual_requests set photo_path = $1, reply_note =
 const [reply] = await rows(A, "select photo_path, reply_note, done_at is not null as done from public.manual_requests");
 assert.deepEqual([reply.photo_path, reply.reply_note, reply.done], [`${A}/manual/s1.jpg`, "왼쪽 가슴에 6cm로", true], "손님은 디자이너 답을 본다");
 
+// '체험 기록 지우기': 주문에 쓰이지 않은 기록만 지우고, 지울 사진 경로를 돌려준다
+await as(A, "insert into public.garments (id, photo_path, data) values ('g3', $1, '{}'), ('g4', $2, '{}')", [`${A}/g3.jpg`, `${A}/g4.jpg`]);
+await as(A, "insert into public.mockup_sessions (id, garment_id, data) values ('s3', 'g3', '{}')");
+await as(A, "insert into public.quotes (id, session_id, data) values ('q3', 's3', '{}'), ('q1b', 's1', '{}')");
+await as(A, "insert into public.manual_requests (session_id) values ('s3')");
+await as(ADMIN, "update public.manual_requests set photo_path = $1, done_at = now() where session_id = 's3'", [`${A}/manual/s3.jpg`]);
+const [{ paths }] = await rows(A, "select public.forget_my_trials() as paths");
+assert.deepEqual([...paths].sort(), [`${A}/g3.jpg`, `${A}/g4.jpg`, `${A}/manual/s3.jpg`], "주문에 안 쓰인 옷 사진과 디자이너 시안만 돌려준다");
+assert.deepEqual(await ids(A, "public.garments"), ["g1", "g2"], "주문에 쓰인 옷은 남는다");
+assert.deepEqual(await ids(A, "public.mockup_sessions"), ["s1", "s2"], "주문에 쓰인 시안은 남는다");
+assert.deepEqual(await ids(A, "public.quotes"), ["q1", "q2"], "주문하지 않은 견적은 지운다");
+assert.deepEqual((await rows(A, "select session_id from public.manual_requests")).map((r) => r.session_id), ["s1"], "주문하지 않은 시안의 디자이너 요청은 지운다");
+assert.deepEqual(await ids(A, "public.orders"), ["o1", "o2"], "주문은 그대로 남는다");
+await as(D, "select public.forget_my_trials()");
+assert.deepEqual(await ids(D, "public.orders"), [], "찾아서 연 주문 열람도 지운다");
+assert.deepEqual(await ids(E, "public.orders"), ["o2"], "다른 사람의 열람은 그대로다");
+
+// AI 학습 동의 철회는 동의한 본인 주문에서 한 번만
+await as(null, `update public.orders set consents = '{"learn": true}' where id = 'o1'`);
+await fails(B, "select public.withdraw_learning('o1')", [], "남의 주문 동의는 철회 못 한다");
+await as(A, "select public.withdraw_learning('o1')");
+const [{ consents }] = await rows(null, "select consents from public.orders where id = 'o1'");
+assert.equal(consents.learn, false, "철회하면 동의가 꺼진다");
+assert.ok(consents.learnWithdrawnAt, "철회한 때가 남는다");
+await fails(A, "select public.withdraw_learning('o1')", [], "이미 철회했으면 다시 못 한다");
+await db.exec("set role anon");
+await assert.rejects(() => db.query("select public.forget_my_trials()"), "로그인 안 한 사람은 지우기를 못 쓴다");
+await db.exec("reset role");
+
 console.log("schema.sql 규칙 검사 통과");

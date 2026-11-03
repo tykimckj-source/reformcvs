@@ -53,6 +53,7 @@ npm run start
 - 주문은 서버(`src/app/api/orders`)가 디자인 가격표로 금액을 다시 계산해 만든다.
 - 발송 등록, 확정 시안 승인·조정 요청, 별점은 데이터베이스 함수가 순서를 지키며 바꾼다.
 - 손님 계정은 브라우저마다 따로 생긴다. 다른 브라우저나 기기에서는 주문번호와 연락처로 자기 주문을 찾아 이어서 본다(`/orders/find`). 틀린 시도는 같은 연락처나 계정마다 하루 10번까지다.
+- 첫 화면의 ‘체험 기록 지우기’는 이 브라우저의 기록과 함께, 서버에서 주문에 쓰이지 않은 옷·시안·견적·디자이너 시안 요청과 그 사진을 지운다. 주문에 쓰인 기록은 법정 보관 기간 동안 남는다. AI 학습 선택 동의는 주문 화면에서 철회한다.
 - 손님은 리폼 작업을 시작하기 전까지 사유와 함께 취소를 요청한다. 반송과 환불은 운영자가 직접 처리하고, 운영 콘솔에서 주문을 '취소'로 바꾼다.
 - 운영 콘솔은 입고 검수 실측값을 저장하고, 상태에 맞는 손님 안내 문구를 복사해 준다(알림톡 대신).
 - 손님이 AI 시안 대신 디자이너에게 직접 요청하면(바라는 점, 알림 받을 연락처는 선택) 운영 콘솔의 '수동 시안 큐'에 쌓인다. 디자이너가 만든 이미지를 올리면 손님 시안 화면과 첫 화면에 바로 나타난다.
@@ -66,7 +67,7 @@ npm run start
 ### 연결하는 법
 
 1. supabase.com에서 프로젝트를 만든다. 지역은 Northeast Asia (Seoul).
-2. SQL Editor에 `supabase/schema.sql`을 통째로 붙여 넣고 실행한다. 예전 schema.sql을 이미 실행한 프로젝트는 대신 `supabase/patch-*.sql` 중 아직 실행하지 않은 것을 순서대로(find-order → measure-cancel → manual) 한 번씩 실행한다.
+2. SQL Editor에 `supabase/schema.sql`을 통째로 붙여 넣고 실행한다. 예전 schema.sql을 이미 실행한 프로젝트는 대신 `supabase/patch-*.sql` 중 아직 실행하지 않은 것을 순서대로(find-order → measure-cancel → manual → privacy) 한 번씩 실행한다.
 3. Authentication → Sign In / Providers에서 **Allow anonymous sign-ins**를 켠다.
 4. Authentication → Users → Add user로 관리자 계정(이메일·비밀번호, Auto Confirm)을 만든다. 그다음 SQL Editor에서 관리자로 등록한다.
 
