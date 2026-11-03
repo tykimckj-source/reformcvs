@@ -6,13 +6,14 @@ import { useCallback, useEffect, useState, type FormEvent } from "react";
 import { Logo } from "@/components/app-frame";
 import { MockupStage } from "@/components/mockup-stage";
 import { Badge, Button, DemoTag, TextField, Toast } from "@/components/ui";
-import { adminSignIn, adminSignOut, backendOn, isAdmin, pullAll, sendConfirm, updateOrder, watchAll } from "@/lib/db";
+import { adminSignIn, adminSignOut, backendOn, isAdmin, pullAll, pullSessions, sendConfirm, updateOrder, watchAll } from "@/lib/db";
 import { SEED_ORDERS } from "@/lib/demo-orders";
 import { colorOf, designBySlug, type Design } from "@/lib/designs";
 import { garmentFromSample } from "@/lib/factory";
 import { csv, cx, won, nowMs } from "@/lib/format";
 import { CATEGORY_LABEL, MATERIAL_LABEL, PLACEMENT_LABEL } from "@/lib/garments";
 import { preparePhoto } from "@/lib/image";
+import { metrics, type Metrics } from "@/lib/metrics";
 import { CANCELLABLE, CARRIERS, contactMessage, maskName, nextStatus, STATUS_LABEL } from "@/lib/orders";
 import { downloadDataUrl } from "@/lib/render";
 import { dispatch, useIsClient, useStore, type State } from "@/lib/store";
@@ -188,12 +189,23 @@ export default function AdminBoard() {
   // 서버 모드: admin이 null이면 로그인 확인 중, server는 모든 손님의 주문
   const [admin, setAdmin] = useState<boolean | null>(null);
   const [server, setServer] = useState<State | null>(null);
+  const [stats, setStats] = useState<Metrics | null>(null);
   const [form, setForm] = useState(EMPTY_FORM);
   const [measure, setMeasure] = useState({ chest: "", anchor: "" });
   const [cancelling, setCancelling] = useState(false);
   const [busy, setBusy] = useState(false);
 
-  const reload = useCallback(() => pullAll().then(setServer).catch(() => setToast("주문을 불러오지 못했어요")), []);
+  const reload = useCallback(
+    () =>
+      Promise.all([pullAll(), pullSessions()])
+        .then(([all, sessions]) => {
+          setServer(all);
+          // '오늘'을 정하려면 현재 시각이 필요해서 렌더가 아니라 불러올 때 계산한다
+          setStats(metrics(sessions, Object.values(all.orders), nowMs()));
+        })
+        .catch(() => setToast("주문을 불러오지 못했어요")),
+    [],
+  );
 
   useEffect(() => {
     if (backendOn) void isAdmin().then(setAdmin);
@@ -301,10 +313,21 @@ export default function AdminBoard() {
     }
   };
 
-  const kpis = backendOn
+  const pct = (v: number | null | undefined) => (v == null ? "—" : `${Math.round(v * 100)}%`);
+  const kpis: { label: string; value: string; sub?: string }[] = backendOn
     ? [
-        { label: "진행 중 주문", value: `${active}건` },
-        { label: "전체 주문", value: `${items.length}건` },
+        { label: "오늘 만든 시안", value: stats ? `${stats.sessionsToday}건` : "—", sub: stats ? `전체 ${stats.sessions}건` : undefined },
+        { label: "체험한 손님", value: stats ? `${stats.visitors}명` : "—", sub: "시안을 하나 이상 만든 손님" },
+        { label: "시안에서 주문까지", value: pct(stats?.conversion), sub: stats ? `주문한 손님 ${stats.buyers}명` : undefined },
+        { label: "진행 중 주문", value: `${active}건`, sub: `전체 ${items.length}건 · 취소 ${stats?.cancelled ?? 0}건` },
+        { label: "주문 금액", value: won(stats?.revenue ?? 0), sub: "취소 제외 합계" },
+        { label: "확정 시안 한 번에 승인", value: pct(stats?.firstApproval), sub: stats ? `승인 ${stats.approved}건 중` : undefined },
+        {
+          label: "주문부터 도착까지",
+          value: stats?.leadDays == null ? "—" : `${stats.leadDays.toFixed(1)}일`,
+          sub: stats ? `도착 ${stats.delivered}건 평균` : undefined,
+        },
+        { label: "별점 평균", value: stats?.rating == null ? "—" : stats.rating.toFixed(1), sub: stats ? `${stats.ratingCount}개` : undefined },
       ]
     : [
         { label: "오늘 만든 시안", value: "128건" },
@@ -375,6 +398,7 @@ export default function AdminBoard() {
             <div key={k.label} className="rounded-2xl border border-line bg-white px-4 py-3">
               <div className="text-[12.5px] text-muted">{k.label}</div>
               <div className="mt-0.5 text-[22px] font-extrabold tracking-[-0.01em]">{k.value}</div>
+              {k.sub ? <div className="text-[12px] text-muted">{k.sub}</div> : null}
             </div>
           ))}
         </div>

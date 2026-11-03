@@ -1,4 +1,5 @@
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
+import type { SessionLog } from "./metrics";
 import type { Action, State } from "./store";
 import type { Garment, MockupSession, Order, OrderStatus, Quote } from "./types";
 
@@ -309,6 +310,20 @@ export async function pullAll(): Promise<State> {
     orders: byId(rows.map((r) => toOrder(r, photos))),
     user: null,
   };
+}
+
+/** 운영 지표용 모든 시안의 주인과 만든 때. 한 번에 1,000줄까지만 오니 나눠 받는다 */
+export async function pullSessions(): Promise<SessionLog[]> {
+  const db = adminDb();
+  const rows: { user_id: string; created_at: string }[] = [];
+  // shortcut: 시안을 모두 받아 브라우저에서 센다. 수만 건이 되면 DB 함수로 옮긴다
+  for (let from = 0; ; from += 1000) {
+    const { data } = check(await db.from("mockup_sessions").select("user_id, created_at").order("created_at").range(from, from + 999));
+    const page = (data ?? []) as typeof rows;
+    rows.push(...page);
+    if (page.length < 1000) break;
+  }
+  return rows.map((r) => ({ userId: r.user_id, createdAt: Date.parse(r.created_at) }));
 }
 
 export function watchAll(onChange: () => void) {
