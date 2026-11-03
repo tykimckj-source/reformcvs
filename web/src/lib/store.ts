@@ -2,7 +2,7 @@
 
 import { useSyncExternalStore } from "react";
 import { backendOn, connect, mirror, pendingSessions, pullMine, watchMine } from "./db";
-import type { Garment, MockupSession, Order, OrderStatus, Quote } from "./types";
+import type { Garment, ManualMockup, MockupSession, Order, OrderStatus, Quote } from "./types";
 
 /**
  * 화면 저장소. 브라우저 localStorage에 저장하고, 다른 탭(운영 콘솔)과 storage 이벤트로 맞춘다.
@@ -13,10 +13,12 @@ export interface State {
   sessions: Record<string, MockupSession>;
   quotes: Record<string, Quote>;
   orders: Record<string, Order>;
+  /** 디자이너 수동 시안 요청과 답. 시안 id가 키다 */
+  manual: Record<string, ManualMockup>;
   user: { name: string } | null;
 }
 
-const EMPTY: State = { garments: {}, sessions: {}, quotes: {}, orders: {}, user: null };
+const EMPTY: State = { garments: {}, sessions: {}, quotes: {}, orders: {}, manual: {}, user: null };
 const KEY = "reform-demo-v1";
 const MAX_UPLOADS = 4;
 
@@ -29,6 +31,7 @@ export type Action =
   | { type: "order/add"; order: Order }
   | { type: "order/update"; id: string; patch: Partial<Order> }
   | { type: "order/status"; id: string; status: OrderStatus; at: number }
+  | { type: "manual/add"; manual: ManualMockup }
   | { type: "user/login"; name: string }
   | { type: "reset" };
 
@@ -63,6 +66,8 @@ function reduce(s: State, a: Action): State {
         orders: { ...s.orders, [a.id]: { ...o, status: a.status, history: [...o.history, { status: a.status, at: a.at }] } },
       };
     }
+    case "manual/add":
+      return { ...s, manual: { ...s.manual, [a.manual.sessionId]: a.manual } };
     case "user/login":
       return { ...s, user: { name: a.name } };
     case "reset":
@@ -136,6 +141,7 @@ export async function refresh() {
     sessions: { ...state.sessions, ...Object.fromEntries(Object.entries(server.sessions).filter(([id]) => !pending.has(id))) },
     quotes: { ...state.quotes, ...server.quotes },
     orders: { ...state.orders, ...server.orders },
+    manual: { ...state.manual, ...server.manual },
   };
   persist();
   emit();

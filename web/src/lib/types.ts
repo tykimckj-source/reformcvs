@@ -107,3 +107,17 @@ export interface Order {
   userId?: string;
   createdAt: number;
 }
+
+/** 디자이너에게 요청한 수동 시안. 손님 요청과 디자이너의 답이 함께 있다 */
+export interface ManualMockup {
+  sessionId: string;
+  /** 요청한 손님. 운영 콘솔이 시안 이미지를 손님 폴더에 올릴 때 쓴다 */
+  userId?: string;
+  note?: string;
+  phone?: string;
+  requestedAt: number;
+  /** 디자이너가 보낸 시안 이미지(열람 주소)와 메모 */
+  image?: string;
+  replyNote?: string;
+  doneAt?: number;
+}

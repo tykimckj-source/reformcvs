@@ -6,7 +6,7 @@ import { useCallback, useEffect, useState, type FormEvent } from "react";
 import { Logo } from "@/components/app-frame";
 import { MockupStage } from "@/components/mockup-stage";
 import { Badge, Button, DemoTag, TextField, Toast } from "@/components/ui";
-import { adminSignIn, adminSignOut, backendOn, isAdmin, pullAll, pullSessions, sendConfirm, updateOrder, watchAll } from "@/lib/db";
+import { adminSignIn, adminSignOut, backendOn, isAdmin, pullAll, pullManual, pullSessions, sendConfirm, updateOrder, watchAll, type ManualItem } from "@/lib/db";
 import { SEED_ORDERS } from "@/lib/demo-orders";
 import { colorOf, designBySlug, type Design } from "@/lib/designs";
 import { garmentFromSample } from "@/lib/factory";
@@ -18,6 +18,7 @@ import { CANCELLABLE, CARRIERS, contactMessage, maskName, nextStatus, STATUS_LAB
 import { downloadDataUrl } from "@/lib/render";
 import { dispatch, useIsClient, useStore, type State } from "@/lib/store";
 import type { Garment, MockupOptions, Order, OrderStatus } from "@/lib/types";
+import ManualQueue from "@/screens/admin-manual";
 
 interface BoardItem {
   key: string;
@@ -190,6 +191,8 @@ export default function AdminBoard() {
   const [admin, setAdmin] = useState<boolean | null>(null);
   const [server, setServer] = useState<State | null>(null);
   const [stats, setStats] = useState<Metrics | null>(null);
+  const [manualItems, setManualItems] = useState<ManualItem[]>([]);
+  const [view, setView] = useState<"board" | "manual">("board");
   const [form, setForm] = useState(EMPTY_FORM);
   const [measure, setMeasure] = useState({ chest: "", anchor: "" });
   const [cancelling, setCancelling] = useState(false);
@@ -197,9 +200,10 @@ export default function AdminBoard() {
 
   const reload = useCallback(
     () =>
-      Promise.all([pullAll(), pullSessions()])
-        .then(([all, sessions]) => {
+      Promise.all([pullAll(), pullSessions(), pullManual()])
+        .then(([all, sessions, manual]) => {
           setServer(all);
+          setManualItems(manual);
           // '오늘'을 정하려면 현재 시각이 필요해서 렌더가 아니라 불러올 때 계산한다
           setStats(metrics(sessions, Object.values(all.orders), nowMs()));
         })
@@ -226,6 +230,7 @@ export default function AdminBoard() {
     : [...(isClient ? liveItems(store) : []), ...seedItems(seedStatus)];
   const selected = items.find((i) => i.key === selectedKey) ?? null;
   const selectedOrder = selected?.order;
+  const waitingManual = manualItems.filter((m) => !m.request.doneAt).length;
   const active = items.filter((i) => i.status !== "DELIVERED" && i.status !== "CANCELLED").length;
 
   const flash = (message: string) => {
@@ -344,11 +349,28 @@ export default function AdminBoard() {
           <span className="rounded-md bg-navy px-2 py-1 text-[12px] font-bold text-white">운영 콘솔</span>
           {backendOn ? null : <DemoTag>시안</DemoTag>}
           <nav className="ml-4 hidden items-center gap-1 text-[14px] md:flex">
-            <span className="inline-flex items-center gap-1.5 rounded-lg bg-[#f1ece4] px-3 py-1.5 font-semibold">
+            <button
+              type="button"
+              onClick={() => setView("board")}
+              className={cx("inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5", view === "board" ? "bg-[#f1ece4] font-semibold" : "text-muted hover:text-ink")}
+            >
               <LayoutGrid size={16} /> 주문 보드
-            </span>
+            </button>
+            {backendOn ? (
+              <button
+                type="button"
+                onClick={() => setView("manual")}
+                className={cx("inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5", view === "manual" ? "bg-[#f1ece4] font-semibold" : "text-muted hover:text-ink")}
+              >
+                <ClipboardList size={16} /> 수동 시안 큐
+                {waitingManual ? <span className="rounded-full bg-accent px-1.5 text-[11px] font-bold text-white">{waitingManual}</span> : null}
+              </button>
+            ) : (
+              <span title="다음 단계에서 만들어요" className="inline-flex cursor-not-allowed items-center gap-1.5 rounded-lg px-3 py-1.5 text-muted">
+                <ClipboardList size={16} /> 수동 시안 큐
+              </span>
+            )}
             {[
-              { icon: ClipboardList, label: "수동 시안 큐" },
               { icon: Palette, label: "디자인 카드" },
               { icon: Settings, label: "라우팅·예산" },
             ].map((n) => (
@@ -380,75 +402,85 @@ export default function AdminBoard() {
       </header>
 
       <main className="mx-auto max-w-[1400px] px-5 pb-16 pt-6">
-        <div className="flex flex-wrap items-end justify-between gap-3">
-          <div>
-            <h1 className="text-[24px] font-extrabold tracking-[-0.02em]">주문 보드</h1>
-            <p className="mt-1 text-[14px] text-muted">고객 화면에서 주문하면 이 보드의 맨 앞에 바로 나타나요.</p>
-          </div>
-          <div className="flex items-center gap-2 text-[12px] text-muted">
-            {backendOn ? null : <DemoTag>예시 수치</DemoTag>}
-            <Button variant="secondary" size="sm" disabled={items.length === 0} onClick={download}>
-              <Download size={15} /> 엑셀로 내려받기
-            </Button>
-          </div>
-        </div>
-
-        <div className="mt-4 grid grid-cols-2 gap-3 md:grid-cols-4">
-          {kpis.map((k) => (
-            <div key={k.label} className="rounded-2xl border border-line bg-white px-4 py-3">
-              <div className="text-[12.5px] text-muted">{k.label}</div>
-              <div className="mt-0.5 text-[22px] font-extrabold tracking-[-0.01em]">{k.value}</div>
-              {k.sub ? <div className="text-[12px] text-muted">{k.sub}</div> : null}
+        {view === "manual" ? (
+          <>
+            <h1 className="text-[24px] font-extrabold tracking-[-0.02em]">수동 시안 큐</h1>
+            <p className="mt-1 text-[14px] text-muted">손님이 AI 시안 대신 디자이너에게 직접 요청한 시안이에요. 만든 이미지를 올리면 손님 시안 화면에 바로 나타나요.</p>
+            <ManualQueue items={manualItems} onSent={reload} flash={flash} />
+          </>
+        ) : (
+          <>
+            <div className="flex flex-wrap items-end justify-between gap-3">
+              <div>
+                <h1 className="text-[24px] font-extrabold tracking-[-0.02em]">주문 보드</h1>
+                <p className="mt-1 text-[14px] text-muted">고객 화면에서 주문하면 이 보드의 맨 앞에 바로 나타나요.</p>
+              </div>
+              <div className="flex items-center gap-2 text-[12px] text-muted">
+                {backendOn ? null : <DemoTag>예시 수치</DemoTag>}
+                <Button variant="secondary" size="sm" disabled={items.length === 0} onClick={download}>
+                  <Download size={15} /> 엑셀로 내려받기
+                </Button>
+              </div>
             </div>
-          ))}
-        </div>
 
-        <div className="no-scrollbar mt-6 flex gap-3 overflow-x-auto pb-4">
-          {COLUMNS.map((col) => {
-            const list = items.filter((i) => col.statuses.includes(i.status));
-            return (
-              <section key={col.key} className="w-[250px] shrink-0 rounded-2xl bg-[#ebe5db]/70 p-2.5">
-                <h2 className="flex items-center justify-between px-1 pb-2 text-[13.5px] font-bold">
-                  {col.title}
-                  <span className="rounded-full bg-white px-2 text-[12px] text-muted">{list.length}</span>
-                </h2>
-                <ul className="space-y-2">
-                  {list.map((item) => (
-                    <li key={item.key}>
-                      <button
-                        type="button"
-                        onClick={() => select(item.key)}
-                        className={cx(
-                          "flex w-full gap-2.5 rounded-xl border bg-white p-2.5 text-left transition hover:shadow-md",
-                          item.live ? "border-accent/60" : "border-line",
-                          selectedKey === item.key && "ring-2 ring-ink",
-                        )}
-                      >
-                        <div className="w-12 shrink-0">
-                          <MockupStage garment={item.garment} layers={[{ designSlug: item.design.slug, options: item.options }]} rounded="rounded-md" />
-                        </div>
-                        <div className="min-w-0 flex-1">
-                          <div className="text-[11px] text-muted">{item.orderNo}</div>
-                          <div className="truncate text-[13.5px] font-semibold">{item.design.name}</div>
-                          <div className="truncate text-[12px] text-muted">
-                            {item.garment.name} · {item.customer}
-                          </div>
-                          <div className="mt-1 flex flex-wrap gap-1">
-                            <Badge tone={item.due.startsWith("D-") && Number(item.due.slice(2)) <= 2 ? "warn" : "neutral"}>{item.due}</Badge>
-                            {item.live ? <Badge tone="accent">새 주문</Badge> : null}
-                            {item.status === "DELIVERED" ? <Badge tone="ok">완료</Badge> : null}
-                            {item.order?.cancelRequestedAt && item.status !== "CANCELLED" ? <Badge tone="warn">취소 요청</Badge> : null}
-                          </div>
-                        </div>
-                      </button>
-                    </li>
-                  ))}
-                  {list.length === 0 ? <li className="rounded-xl border border-dashed border-[#d3cabb] px-3 py-6 text-center text-[12.5px] text-muted">비어 있어요</li> : null}
-                </ul>
-              </section>
-            );
-          })}
-        </div>
+            <div className="mt-4 grid grid-cols-2 gap-3 md:grid-cols-4">
+              {kpis.map((k) => (
+                <div key={k.label} className="rounded-2xl border border-line bg-white px-4 py-3">
+                  <div className="text-[12.5px] text-muted">{k.label}</div>
+                  <div className="mt-0.5 text-[22px] font-extrabold tracking-[-0.01em]">{k.value}</div>
+                  {k.sub ? <div className="text-[12px] text-muted">{k.sub}</div> : null}
+                </div>
+              ))}
+            </div>
+
+            <div className="no-scrollbar mt-6 flex gap-3 overflow-x-auto pb-4">
+              {COLUMNS.map((col) => {
+                const list = items.filter((i) => col.statuses.includes(i.status));
+                return (
+                  <section key={col.key} className="w-[250px] shrink-0 rounded-2xl bg-[#ebe5db]/70 p-2.5">
+                    <h2 className="flex items-center justify-between px-1 pb-2 text-[13.5px] font-bold">
+                      {col.title}
+                      <span className="rounded-full bg-white px-2 text-[12px] text-muted">{list.length}</span>
+                    </h2>
+                    <ul className="space-y-2">
+                      {list.map((item) => (
+                        <li key={item.key}>
+                          <button
+                            type="button"
+                            onClick={() => select(item.key)}
+                            className={cx(
+                              "flex w-full gap-2.5 rounded-xl border bg-white p-2.5 text-left transition hover:shadow-md",
+                              item.live ? "border-accent/60" : "border-line",
+                              selectedKey === item.key && "ring-2 ring-ink",
+                            )}
+                          >
+                            <div className="w-12 shrink-0">
+                              <MockupStage garment={item.garment} layers={[{ designSlug: item.design.slug, options: item.options }]} rounded="rounded-md" />
+                            </div>
+                            <div className="min-w-0 flex-1">
+                              <div className="text-[11px] text-muted">{item.orderNo}</div>
+                              <div className="truncate text-[13.5px] font-semibold">{item.design.name}</div>
+                              <div className="truncate text-[12px] text-muted">
+                                {item.garment.name} · {item.customer}
+                              </div>
+                              <div className="mt-1 flex flex-wrap gap-1">
+                                <Badge tone={item.due.startsWith("D-") && Number(item.due.slice(2)) <= 2 ? "warn" : "neutral"}>{item.due}</Badge>
+                                {item.live ? <Badge tone="accent">새 주문</Badge> : null}
+                                {item.status === "DELIVERED" ? <Badge tone="ok">완료</Badge> : null}
+                                {item.order?.cancelRequestedAt && item.status !== "CANCELLED" ? <Badge tone="warn">취소 요청</Badge> : null}
+                              </div>
+                            </div>
+                          </button>
+                        </li>
+                      ))}
+                      {list.length === 0 ? <li className="rounded-xl border border-dashed border-[#d3cabb] px-3 py-6 text-center text-[12.5px] text-muted">비어 있어요</li> : null}
+                    </ul>
+                  </section>
+                );
+              })}
+            </div>
+          </>
+        )}
       </main>
 
       {selected ? (

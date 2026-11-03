@@ -1,7 +1,7 @@
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import type { SessionLog } from "./metrics";
 import type { Action, State } from "./store";
-import type { Garment, MockupSession, Order, OrderStatus, Quote } from "./types";
+import type { Garment, ManualMockup, MockupSession, Order, OrderStatus, Quote } from "./types";
 
 /**
  * Supabase 연결. 키가 없으면 backendOn이 false라서 지금처럼 이 브라우저에만 저장하는 시연 모드로 돈다.
@@ -77,6 +77,28 @@ export function toOrder(r: OrderRow, photos = new Map<string, string>()): Order 
   };
 }
 
+interface ManualRow {
+  session_id: string;
+  user_id: string;
+  note: string | null;
+  phone: string | null;
+  requested_at: string;
+  photo_path: string | null;
+  reply_note: string | null;
+  done_at: string | null;
+}
+
+const toManual = (r: ManualRow, photos: Map<string, string>): ManualMockup => ({
+  sessionId: r.session_id,
+  userId: r.user_id,
+  note: r.note ?? undefined,
+  phone: r.phone ?? undefined,
+  requestedAt: Date.parse(r.requested_at),
+  image: r.photo_path ? photos.get(r.photo_path) : undefined,
+  replyNote: r.reply_note ?? undefined,
+  doneAt: r.done_at ? Date.parse(r.done_at) : undefined,
+});
+
 const toGarment = (r: GarmentRow, photos: Map<string, string>): Garment =>
   r.photo_path ? { ...r.data, image: photos.get(r.photo_path) ?? "" } : r.data;
 
@@ -131,7 +153,7 @@ async function saveQuote(q: Quote) {
   check(await customerDb().from("quotes").upsert({ id: q.id, user_id: uid, session_id: q.sessionId, data: q }));
 }
 
-let read: () => State = () => ({ garments: {}, sessions: {}, quotes: {}, orders: {}, user: null });
+let read: () => State = () => ({ garments: {}, sessions: {}, quotes: {}, orders: {}, manual: {}, user: null });
 let queue: Promise<void> = Promise.resolve();
 const waiting = new Map<string, number>(); // 아직 보내지 않은 시안 id → 타이머
 
@@ -182,20 +204,27 @@ export async function pullMine(): Promise<Omit<State, "user"> | null> {
   const db = customerDb();
   const { data } = await db.auth.getSession();
   if (!data.session) return null;
-  const [g, s, q, o] = await Promise.all([
+  const [g, s, q, o, m] = await Promise.all([
     db.from("garments").select("id, photo_path, data").then(check),
     db.from("mockup_sessions").select("data").then(check),
     db.from("quotes").select("data").then(check),
     db.from("orders").select(ORDER_COLUMNS).then(check),
+    db.from("manual_requests").select("*").then(check),
   ]);
   const garments = g.data as GarmentRow[];
   const orders = o.data as OrderRow[];
-  const photos = await signPhotos(db, [...garments.map((r) => r.photo_path), ...orders.map((r) => r.confirm_photo_path)]);
+  const manual = m.data as ManualRow[];
+  const photos = await signPhotos(db, [
+    ...garments.map((r) => r.photo_path),
+    ...orders.map((r) => r.confirm_photo_path),
+    ...manual.map((r) => r.photo_path),
+  ]);
   return {
     garments: byId(garments.map((r) => toGarment(r, photos))),
     sessions: byId((s.data as { data: MockupSession }[]).map((r) => r.data)),
     quotes: byId((q.data as { data: Quote }[]).map((r) => r.data)),
     orders: byId(orders.map((r) => toOrder(r, photos))),
+    manual: Object.fromEntries(manual.map((r) => [r.session_id, toManual(r, photos)])),
   };
 }
 
@@ -208,6 +237,7 @@ export function watchMine(onChange: () => void) {
   const channel = db
     .channel("my-orders")
     .on("postgres_changes", { event: "*", schema: "public", table: "orders" }, onChange)
+    .on("postgres_changes", { event: "*", schema: "public", table: "manual_requests" }, onChange)
     .subscribe();
   unwatchMine = () => void db.removeChannel(channel);
 }
@@ -260,6 +290,17 @@ export const answerConfirm = (id: string, approve: boolean, note?: string) =>
 export const rateOrder = (id: string, rating: number) => call("rate_order", { p_order_id: id, p_rating: rating });
 export const requestCancel = (id: string, reason: string) => call("request_cancel", { p_order_id: id, p_reason: reason });
 
+/** 디자이너에게 이 시안을 직접 만들어 달라고 요청한다. 디자이너가 옷 사진을 봐야 하니 옷과 시안을 서버에 확실히 적은 뒤 남긴다 */
+export async function requestManual(garment: Garment, session: MockupSession, note: string, phone: string) {
+  await flush();
+  await saveGarment(garment, true);
+  await saveSession(session);
+  const { error } = await customerDb()
+    .from("manual_requests")
+    .insert({ session_id: session.id, note: note.trim() || null, phone: phone.trim() || null });
+  if (error) throw new Error(error.code === "23505" ? "이미 디자이너에게 요청했어요" : "요청을 보내지 못했어요. 다시 시도해 주세요");
+}
+
 /** 다른 브라우저에서 한 주문을 주문번호와 연락처로 찾아 이 브라우저 계정에도 연다. 못 찾으면 null */
 export async function findOrder(orderNo: string, phone: string): Promise<string | null> {
   await customerId();
@@ -308,8 +349,41 @@ export async function pullAll(): Promise<State> {
     sessions: byId(rows.map((r) => r.mockup_sessions.data)),
     quotes: {},
     orders: byId(rows.map((r) => toOrder(r, photos))),
+    manual: {},
     user: null,
   };
+}
+
+/** 수동 시안 큐 한 줄: 요청과 그 시안·옷 */
+export interface ManualItem {
+  request: ManualMockup;
+  session: MockupSession;
+  garment: Garment;
+}
+
+export async function pullManual(): Promise<ManualItem[]> {
+  const db = adminDb();
+  const { data } = check(
+    await db
+      .from("manual_requests")
+      .select("*, mockup_sessions!session_id(data, garments(id, photo_path, data))")
+      .order("requested_at"),
+  );
+  const rows = (data ?? []) as (ManualRow & { mockup_sessions: { data: MockupSession; garments: GarmentRow } })[];
+  const photos = await signPhotos(db, rows.flatMap((r) => [r.photo_path, r.mockup_sessions.garments.photo_path]));
+  return rows.map((r) => ({ request: toManual(r, photos), session: r.mockup_sessions.data, garment: toGarment(r.mockup_sessions.garments, photos) }));
+}
+
+/** 디자이너가 만든 시안 이미지를 손님 폴더에 올리고 요청에 답한다 */
+export async function sendManual(request: ManualMockup, photo: Blob, note: string) {
+  const db = adminDb();
+  const path = `${request.userId}/manual/${request.sessionId}.jpg`;
+  check(await db.storage.from(BUCKET).upload(path, photo, { contentType: "image/jpeg", upsert: true }));
+  const { error } = await db
+    .from("manual_requests")
+    .update({ photo_path: path, reply_note: note.trim() || null, done_at: new Date().toISOString() })
+    .eq("session_id", request.sessionId);
+  if (error) throw new Error(error.message);
 }
 
 /** 운영 지표용 모든 시안의 주인과 만든 때. 한 번에 1,000줄까지만 오니 나눠 받는다 */
@@ -331,6 +405,7 @@ export function watchAll(onChange: () => void) {
   const channel = db
     .channel("all-orders")
     .on("postgres_changes", { event: "*", schema: "public", table: "orders" }, onChange)
+    .on("postgres_changes", { event: "*", schema: "public", table: "manual_requests" }, onChange)
     .subscribe();
   return () => void db.removeChannel(channel);
 }

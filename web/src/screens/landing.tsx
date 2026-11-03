@@ -42,8 +42,11 @@ const FABRICS = ["#3e5f8a", "#f1efe9", "#a8aaad", "#2a2b30", "#d6c2a0", "#6e6c46
 
 export default function Landing() {
   const [toast, setToast] = useState<string | null>(null);
-  const { orders } = useStore();
+  const { orders, manual } = useStore();
   const mine = Object.values(orders).sort((a, b) => b.createdAt - a.createdAt)[0];
+  const designerReady = Object.values(manual)
+    .filter((m) => m.doneAt)
+    .sort((a, b) => (b.doneAt ?? 0) - (a.doneAt ?? 0))[0];
 
   const resetDemo = async () => {
     if (backendOn) await forgetMe();
@@ -100,6 +103,14 @@ export default function Landing() {
             <span className="flex items-center gap-0.5 font-semibold">
               {STATUS_LABEL[mine.status]} <ChevronRight size={16} />
             </span>
+          </Link>
+        ) : null}
+        {designerReady ? (
+          <Link
+            href={`/m/${designerReady.sessionId}`}
+            className="flex items-center justify-between rounded-2xl border border-accent/40 bg-accent-soft px-4 py-3 text-[14px] font-semibold text-accent"
+          >
+            디자이너 시안이 도착했어요 <ChevronRight size={16} />
           </Link>
         ) : null}
         <Link href="/orders/find" className="pt-1 text-center text-[13.5px] font-semibold text-muted underline underline-offset-4 hover:text-ink">

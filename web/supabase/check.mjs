@@ -165,4 +165,15 @@ assert.equal(
 await fails(D, "select public.register_shipment('o2', 'CJ대한통운', '123456789012')", [], "취소된 주문은 더 진행하지 못한다");
 await fails(ADMIN, "update public.orders set status = 'LOST' where id = 'o2'", [], "정해진 상태만 쓴다");
 
+// 디자이너 수동 시안: 손님은 자기 시안에 요청만 남기고, 답은 관리자만 쓴다
+await fails(B, "insert into public.manual_requests (session_id, note) values ('s1', '더 작게')", [], "남의 시안에는 요청 못 한다");
+await fails(A, "insert into public.manual_requests (session_id, photo_path) values ('s1', 'x.jpg')", [], "손님이 답을 미리 채울 수 없다");
+await as(A, "insert into public.manual_requests (session_id, note, phone) values ('s1', '자수를 조금 더 작게', '010-1234-5678')");
+await fails(A, "insert into public.manual_requests (session_id) values ('s1')", [], "같은 시안에 두 번 요청은 막는다");
+assert.equal((await as(A, "update public.manual_requests set photo_path = 'x.jpg'")).affectedRows, 0, "손님은 답을 쓸 수 없다");
+assert.equal((await rows(B, "select session_id from public.manual_requests")).length, 0, "남의 요청은 못 본다");
+await as(ADMIN, "update public.manual_requests set photo_path = $1, reply_note = '왼쪽 가슴에 6cm로', done_at = now() where session_id = 's1'", [`${A}/manual/s1.jpg`]);
+const [reply] = await rows(A, "select photo_path, reply_note, done_at is not null as done from public.manual_requests");
+assert.deepEqual([reply.photo_path, reply.reply_note, reply.done], [`${A}/manual/s1.jpg`, "왼쪽 가슴에 6cm로", true], "손님은 디자이너 답을 본다");
+
 console.log("schema.sql 규칙 검사 통과");

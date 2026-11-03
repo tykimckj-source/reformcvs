@@ -7,6 +7,7 @@ import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties } from
 import { BottomBar, Missing, PhoneFrame, ScreenSkeleton, TopBar } from "@/components/app-frame";
 import { MockupStage } from "@/components/mockup-stage";
 import { Badge, Button, Card, Chip, DemoTag, Label, Toast } from "@/components/ui";
+import { backendOn, requestManual as askDesigner } from "@/lib/db";
 import { checkDesign, designBySlug, priceLines, sumLines } from "@/lib/designs";
 import { cx, newId, won, nowMs } from "@/lib/format";
 import { PLACEMENT_LABEL } from "@/lib/garments";
@@ -23,8 +24,9 @@ export default function MockupScreen() {
   const { sessionId } = useParams<{ sessionId: string }>();
   const router = useRouter();
   const isClient = useIsClient();
-  const { sessions, garments } = useStore();
+  const { sessions, garments, manual } = useStore();
   const session = sessions[sessionId];
+  const designerMockup = manual[sessionId];
   const garment = session ? garments[session.garmentId] : undefined;
   const design = session ? designBySlug(session.designSlug) : undefined;
 
@@ -34,6 +36,7 @@ export default function MockupScreen() {
   const [viewer, setViewer] = useState<Candidate | null>(null);
   const [toast, setToast] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const [manualForm, setManualForm] = useState<{ note: string; phone: string } | null>(null);
   const timers = useRef<number[]>([]);
   const run = useRef(0);
 
@@ -136,8 +139,25 @@ export default function MockupScreen() {
   };
 
   const requestManual = () => {
+    // 서버가 있으면 바라는 점과 연락처를 받아 실제로 운영 콘솔에 요청을 남긴다
+    if (backendOn) return setManualForm({ note: "", phone: "" });
     dispatch({ type: "session/update", id: session.id, patch: { manualRequested: true } });
     setToast("디자이너에게 시안을 요청했어요. 24시간 안에 알림톡으로 보내 드려요.");
+  };
+
+  const sendManualRequest = async () => {
+    if (!manualForm) return;
+    try {
+      await askDesigner(garment, session, manualForm.note, manualForm.phone);
+      dispatch({
+        type: "manual/add",
+        manual: { sessionId: session.id, note: manualForm.note.trim() || undefined, phone: manualForm.phone.trim() || undefined, requestedAt: nowMs() },
+      });
+      setManualForm(null);
+      setToast("디자이너에게 요청했어요. 시안이 오면 이 화면에서 볼 수 있어요.");
+    } catch (e) {
+      setToast(e instanceof Error ? e.message : "요청을 보내지 못했어요");
+    }
   };
 
   const order = () => {
@@ -286,6 +306,16 @@ export default function MockupScreen() {
       </section>
 
       <section className="px-5 pt-6">
+        {designerMockup?.doneAt ? (
+          <Card className="mb-3">
+            <div className="text-[16px] font-bold">디자이너 시안</div>
+            {designerMockup.image ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={designerMockup.image} alt="디자이너가 내 옷에 맞춰 만든 시안" className="mt-2 w-full rounded-2xl" />
+            ) : null}
+            {designerMockup.replyNote ? <p className="mt-2 text-[13.5px] leading-relaxed">{designerMockup.replyNote}</p> : null}
+          </Card>
+        ) : null}
         <Card>
           <div className="flex items-center gap-1.5 text-[16px] font-bold">
             <Sparkles size={17} className="text-accent" /> AI 정밀 시안 <DemoTag />
@@ -374,9 +404,44 @@ export default function MockupScreen() {
             시안 단계라 화면 합성으로 예시를 보여 드려요. 서비스에서는 생성 AI가 만들고 자동 검사를 통과한 시안만 보여요.
           </p>
         </Card>
-        <button type="button" onClick={requestManual} className="mt-3 w-full py-2 text-center text-[13.5px] font-semibold text-muted underline underline-offset-4">
-          {session.manualRequested ? "디자이너 시안을 요청했어요. 24시간 안에 도착해요" : "원하는 시안이 아닌가요? 디자이너에게 직접 요청하기"}
-        </button>
+        {designerMockup || session.manualRequested ? (
+          <p className="mt-3 py-2 text-center text-[13.5px] font-semibold text-muted">
+            {designerMockup?.doneAt ? "디자이너 시안이 도착했어요. 위에서 확인해 보세요" : "디자이너 시안을 요청했어요. 보통 24시간 안에 이 화면에 도착해요"}
+          </p>
+        ) : manualForm ? (
+          <Card className="mt-3">
+            <div className="text-[14.5px] font-semibold">디자이너에게 직접 요청</div>
+            <p className="mt-1 text-[13px] leading-relaxed text-muted">디자이너가 내 옷 사진에 맞춰 시안을 만들어 이 화면으로 보내 드려요.</p>
+            <textarea
+              value={manualForm.note}
+              onChange={(e) => setManualForm({ ...manualForm, note: e.target.value })}
+              maxLength={500}
+              placeholder="바라는 점 (예: 자수를 조금 더 작게, 소매 쪽으로)"
+              className="mt-2 h-20 w-full resize-none rounded-xl border border-line p-3 text-[14px] outline-none focus:border-ink"
+            />
+            <input
+              value={manualForm.phone}
+              onChange={(e) => setManualForm({ ...manualForm, phone: e.target.value })}
+              inputMode="tel"
+              maxLength={20}
+              aria-label="완성되면 알려 드릴 연락처"
+              placeholder="완성되면 알려 드릴 연락처 (선택)"
+              className="mt-2 h-11 w-full rounded-xl border border-line px-3 text-[14px] outline-none focus:border-ink"
+            />
+            <div className="mt-2 grid grid-cols-2 gap-2">
+              <Button variant="secondary" size="md" onClick={() => setManualForm(null)}>
+                닫기
+              </Button>
+              <Button size="md" onClick={sendManualRequest}>
+                요청 보내기
+              </Button>
+            </div>
+          </Card>
+        ) : (
+          <button type="button" onClick={requestManual} className="mt-3 w-full py-2 text-center text-[13.5px] font-semibold text-muted underline underline-offset-4">
+            원하는 시안이 아닌가요? 디자이너에게 직접 요청하기
+          </button>
+        )}
       </section>
 
       <div className="h-6" />
