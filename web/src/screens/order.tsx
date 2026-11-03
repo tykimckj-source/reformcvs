@@ -7,6 +7,7 @@ import { useEffect, useState } from "react";
 import { Missing, PhoneFrame, ScreenSkeleton, TopBar } from "@/components/app-frame";
 import { MockupStage } from "@/components/mockup-stage";
 import { Button, Card, DemoTag, Toast } from "@/components/ui";
+import { answerConfirm, backendOn, rateOrder, shipOrder } from "@/lib/db";
 import { colorOf, designBySlug } from "@/lib/designs";
 import { cx, timeLabel, won, nowMs } from "@/lib/format";
 import { PLACEMENT_LABEL } from "@/lib/garments";
@@ -43,11 +44,26 @@ export default function OrderScreen() {
   const setStatus = (status: OrderStatus) => dispatch({ type: "order/status", id: order.id, status, at: nowMs() });
   const timeOf = (status: OrderStatus) => order.history.find((h) => h.status === status)?.at;
 
-  const registerShipment = (c: string, n: string) => {
-    dispatch({ type: "order/update", id: order.id, patch: { tracking: { carrier: c, number: n } } });
-    setStatus("INBOUND_TRANSIT");
-    setToast("발송을 등록했어요. 작업실에 도착하면 알려 드릴게요.");
+  /** 서버가 있으면 먼저 서버 규칙을 통과시킨 뒤 화면에 반영한다 */
+  const act = async (onServer: () => Promise<void>, apply: () => void, message: string) => {
+    try {
+      if (backendOn) await onServer();
+      apply();
+      setToast(message);
+    } catch (e) {
+      setToast(e instanceof Error ? e.message : "다시 시도해 주세요");
+    }
   };
+
+  const registerShipment = (c: string, n: string) =>
+    act(
+      () => shipOrder(order.id, c, n),
+      () => {
+        dispatch({ type: "order/update", id: order.id, patch: { tracking: { carrier: c, number: n } } });
+        setStatus("INBOUND_TRANSIT");
+      },
+      "발송을 등록했어요. 작업실에 도착하면 알려 드릴게요.",
+    );
 
   const demoNext = () => {
     if (order.status === "AWAITING_SHIPMENT") return registerShipment("GS25 반값택배", "3612 0045 8821");
@@ -158,7 +174,15 @@ export default function OrderScreen() {
               <span className="text-[12px] font-semibold text-accent">기한 안에 답해 주세요</span>
             </div>
             <p className="mt-1 text-[13.5px] text-muted">작업실에 도착한 실물 위에 디자인을 맞춰 봤어요.</p>
-            <div className="mt-3">{stage}</div>
+            <div className="mt-3">
+              {order.confirmPhoto ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={order.confirmPhoto} alt="작업실에 도착한 실물 사진" className="w-full rounded-2xl" />
+              ) : (
+                stage
+              )}
+            </div>
+            {order.confirmNote ? <p className="mt-2 text-[13.5px] leading-relaxed">{order.confirmNote}</p> : null}
             <ul className="mt-3 space-y-1 rounded-xl bg-[#f6f2ec] p-3 text-[13.5px]">
               <li>위치 · {PLACEMENT_LABEL[o.placement]} (실측 기준)</li>
               <li>크기 · {o.sizeCm.toFixed(1)}cm</li>
@@ -179,12 +203,17 @@ export default function OrderScreen() {
                   <Button
                     size="md"
                     disabled={!note.trim()}
-                    onClick={() => {
-                      dispatch({ type: "order/update", id: order.id, patch: { adjustNote: note.trim() } });
-                      setStatus("INSPECTING");
-                      setAdjusting(false);
-                      setToast("조정 요청을 보냈어요. 다시 맞춰서 보내 드릴게요.");
-                    }}
+                    onClick={() =>
+                      act(
+                        () => answerConfirm(order.id, false, note.trim()),
+                        () => {
+                          dispatch({ type: "order/update", id: order.id, patch: { adjustNote: note.trim() } });
+                          setStatus("INSPECTING");
+                          setAdjusting(false);
+                        },
+                        "조정 요청을 보냈어요. 다시 맞춰서 보내 드릴게요.",
+                      )
+                    }
                   >
                     요청 보내기
                   </Button>
@@ -193,10 +222,9 @@ export default function OrderScreen() {
             ) : (
               <div className="mt-3 grid gap-2">
                 <Button
-                  onClick={() => {
-                    setStatus("IN_PROGRESS");
-                    setToast("승인했어요. 작업을 시작할게요.");
-                  }}
+                  onClick={() =>
+                    act(() => answerConfirm(order.id, true), () => setStatus("IN_PROGRESS"), "승인했어요. 작업을 시작할게요.")
+                  }
                 >
                   이대로 진행할게요
                 </Button>
@@ -227,7 +255,9 @@ export default function OrderScreen() {
             <h2 className="flex items-center gap-2 text-[17px] font-bold">
               <Truck size={18} className="text-accent" /> 다시 보내 드렸어요
             </h2>
-            <p className="mt-1 text-[13.5px] text-muted">CJ대한통운 · 6843 2210 9071 (예시)</p>
+            <p className="mt-1 text-[13.5px] text-muted">
+              {order.outbound ? `${order.outbound.carrier} · ${order.outbound.number}` : "CJ대한통운 · 6843 2210 9071 (예시)"}
+            </p>
           </Card>
         ) : null}
 
@@ -243,10 +273,13 @@ export default function OrderScreen() {
                   key={n}
                   type="button"
                   aria-label={`${n}점`}
-                  onClick={() => {
-                    dispatch({ type: "order/update", id: order.id, patch: { rating: n } });
-                    setToast("소중한 평가 고마워요. 다음 시안을 더 정확하게 만드는 데 써요.");
-                  }}
+                  onClick={() =>
+                    act(
+                      () => rateOrder(order.id, n),
+                      () => dispatch({ type: "order/update", id: order.id, patch: { rating: n } }),
+                      "소중한 평가 고마워요. 다음 시안을 더 정확하게 만드는 데 써요.",
+                    )
+                  }
                   className="grid h-11 w-11 place-items-center rounded-xl border border-line bg-white"
                 >
                   <Star size={20} className={(order.rating ?? 0) >= n ? "fill-sun text-sun" : "text-[#cfc7bb]"} />
@@ -287,7 +320,8 @@ export default function OrderScreen() {
         </ol>
       </section>
 
-      <section className="px-5 pb-10 pt-6">
+      {/* 서버가 붙으면 다음 단계는 운영 콘솔에서만 넘긴다 */}
+      <section className={cx("px-5 pb-10 pt-6", backendOn && "hidden")}>
         <div className="rounded-[20px] border border-dashed border-[#cfc6b8] bg-[#fbf9f5] p-4">
           <div className="flex items-center gap-2">
             <span className="text-[14px] font-semibold">시연용 진행</span>

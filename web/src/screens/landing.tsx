@@ -6,6 +6,7 @@ import { useState } from "react";
 import { Logo, PhoneFrame } from "@/components/app-frame";
 import { DesignSwatch, MockupStage } from "@/components/mockup-stage";
 import { LinkButton, Toast } from "@/components/ui";
+import { backendOn, forgetMe } from "@/lib/db";
 import { DESIGNS } from "@/lib/designs";
 import { garmentFromSample } from "@/lib/factory";
 import { won } from "@/lib/format";
@@ -41,7 +42,8 @@ const FABRICS = ["#3e5f8a", "#f1efe9", "#a8aaad", "#2a2b30", "#d6c2a0", "#6e6c46
 export default function Landing() {
   const [toast, setToast] = useState<string | null>(null);
 
-  const resetDemo = () => {
+  const resetDemo = async () => {
+    if (backendOn) await forgetMe();
     dispatch({ type: "reset" });
     setToast("체험 기록을 모두 지웠어요");
     window.setTimeout(() => setToast(null), 2400);

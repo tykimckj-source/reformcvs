@@ -1,12 +1,12 @@
 "use client";
 
 import { useSyncExternalStore } from "react";
+import { backendOn, connect, mirror, pendingSessions, pullMine, watchMine } from "./db";
 import type { Garment, MockupSession, Order, OrderStatus, Quote } from "./types";
 
 /**
- * 백엔드가 없는 시안 단계의 임시 저장소.
- * 브라우저 localStorage에만 저장하고, 다른 탭(운영 콘솔)과 storage 이벤트로 맞춘다.
- * 백엔드가 붙으면 이 파일의 dispatch 자리를 API 호출로 바꾼다.
+ * 화면 저장소. 브라우저 localStorage에 저장하고, 다른 탭(운영 콘솔)과 storage 이벤트로 맞춘다.
+ * Supabase 키가 있으면(backendOn) 바뀐 내용을 서버에도 따라 적고, 서버 기록을 받아 합친다.
  */
 export interface State {
   garments: Record<string, Garment>;
@@ -100,17 +100,46 @@ function ensureLoaded() {
     state = parse(e.newValue);
     emit();
   });
+  if (backendOn) {
+    connect(() => state);
+    void refresh();
+  }
 }
 
-export function dispatch(action: Action) {
-  ensureLoaded();
-  state = reduce(state, action);
+function persist() {
   try {
     window.localStorage.setItem(KEY, JSON.stringify(state));
   } catch {
     // 저장 공간이 모자라도 화면은 계속 동작한다
   }
+}
+
+export function dispatch(action: Action) {
+  ensureLoaded();
+  state = reduce(state, action);
+  persist();
   emit();
+  if (backendOn) mirror(action);
+}
+
+/** 서버 기록을 받아 합친다. 같은 id면 서버 쪽이 이기고, 아직 보내는 중인 시안은 그대로 둔다. */
+export async function refresh() {
+  const server = await pullMine().catch((e) => {
+    console.error("서버 기록을 불러오지 못했어요", e);
+    return null;
+  });
+  if (!server) return;
+  const pending = pendingSessions();
+  state = {
+    ...state,
+    garments: { ...state.garments, ...server.garments },
+    sessions: { ...state.sessions, ...Object.fromEntries(Object.entries(server.sessions).filter(([id]) => !pending.has(id))) },
+    quotes: { ...state.quotes, ...server.quotes },
+    orders: { ...state.orders, ...server.orders },
+  };
+  persist();
+  emit();
+  watchMine(() => void refresh());
 }
 
 function subscribe(listener: () => void) {

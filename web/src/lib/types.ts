@@ -89,8 +89,15 @@ export interface Order {
   status: OrderStatus;
   history: { status: OrderStatus | "PAID"; at: number }[];
   tracking?: { carrier: string; number: string };
+  /** 작업이 끝나 돌려보낸 택배 */
+  outbound?: { carrier: string; number: string };
   customer: { name: string; phone: string; address: string };
+  /** 입고 후 운영자가 올린 실물 사진(열람 주소)과 메모 */
+  confirmPhoto?: string;
+  confirmNote?: string;
   adjustNote?: string;
   rating?: number;
+  /** 서버 주문의 주인. 운영 콘솔이 사진을 손님 폴더에 올릴 때 쓴다 */
+  userId?: string;
   createdAt: number;
 }

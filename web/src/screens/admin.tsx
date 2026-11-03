@@ -1,19 +1,22 @@
 "use client";
 
-import { Bell, ClipboardList, ExternalLink, LayoutGrid, Palette, Settings, X } from "lucide-react";
+import { Bell, ClipboardList, Download, ExternalLink, LayoutGrid, LogOut, Palette, Settings, X } from "lucide-react";
 import Link from "next/link";
-import { useState } from "react";
+import { useCallback, useEffect, useState, type FormEvent } from "react";
 import { Logo } from "@/components/app-frame";
 import { MockupStage } from "@/components/mockup-stage";
-import { Badge, Button, DemoTag, Toast } from "@/components/ui";
+import { Badge, Button, DemoTag, TextField, Toast } from "@/components/ui";
+import { adminSignIn, adminSignOut, backendOn, isAdmin, pullAll, sendConfirm, updateOrder, watchAll } from "@/lib/db";
 import { SEED_ORDERS } from "@/lib/demo-orders";
 import { colorOf, designBySlug, type Design } from "@/lib/designs";
 import { garmentFromSample } from "@/lib/factory";
-import { cx, won, nowMs } from "@/lib/format";
+import { csv, cx, won, nowMs } from "@/lib/format";
 import { CATEGORY_LABEL, MATERIAL_LABEL, PLACEMENT_LABEL } from "@/lib/garments";
-import { maskName, nextStatus, STATUS_LABEL } from "@/lib/orders";
+import { preparePhoto } from "@/lib/image";
+import { CARRIERS, maskName, nextStatus, STATUS_LABEL } from "@/lib/orders";
+import { downloadDataUrl } from "@/lib/render";
 import { dispatch, useIsClient, useStore, type State } from "@/lib/store";
-import type { Garment, MockupOptions, OrderStatus } from "@/lib/types";
+import type { Garment, MockupOptions, Order, OrderStatus } from "@/lib/types";
 
 interface BoardItem {
   key: string;
@@ -29,7 +32,10 @@ interface BoardItem {
   live: boolean;
   orderId?: string;
   adjustNote?: string;
+  order?: Order;
 }
+
+const EMPTY_FORM = { photo: null as File | null, note: "", carrier: "CJ대한통운", number: "" };
 
 const COLUMNS: { key: string; title: string; statuses: OrderStatus[] }[] = [
   { key: "ship", title: "발송 대기", statuses: ["AWAITING_SHIPMENT"] },
@@ -70,6 +76,7 @@ function liveItems(s: State): BoardItem[] {
           live: true,
           orderId: o.id,
           adjustNote: o.adjustNote,
+          order: o,
         },
       ];
     });
@@ -96,14 +103,109 @@ const seedItems = (statuses: Record<string, OrderStatus>): BoardItem[] =>
     ];
   });
 
+const kst = (ts: number) => new Date(ts).toLocaleString("sv-SE", { timeZone: "Asia/Seoul" });
+
+/** 보드의 주문을 엑셀용 표로. 정산·결과보고·택배 접수에 쓴다 */
+const boardCsv = (items: BoardItem[]) =>
+  csv([
+    ["주문번호", "주문일시", "상태", "디자인", "의류", "위치", "크기(cm)", "색상", "이니셜", "금액(원)", "이름", "연락처", "주소", "받은 택배", "보낸 택배", "고객 요청", "별점"],
+    ...items.map((i) => [
+      i.orderNo,
+      i.order ? kst(i.order.createdAt).slice(0, 16) : "",
+      STATUS_LABEL[i.status],
+      i.design.name,
+      `${CATEGORY_LABEL[i.garment.category]} · ${i.garment.colorName}`,
+      PLACEMENT_LABEL[i.options.placement],
+      i.options.sizeCm,
+      colorOf(i.design, i.options.colorId).label,
+      i.options.text,
+      i.total,
+      i.order?.customer.name ?? i.customer,
+      i.order?.customer.phone,
+      i.order?.customer.address,
+      i.order?.tracking && `${i.order.tracking.carrier} ${i.order.tracking.number}`,
+      i.order?.outbound && `${i.order.outbound.carrier} ${i.order.outbound.number}`,
+      i.adjustNote,
+      i.order?.rating,
+    ]),
+  ]);
+
+function AdminLogin({ onDone }: { onDone: () => void }) {
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  const submit = async (e: FormEvent) => {
+    e.preventDefault();
+    setBusy(true);
+    setError(null);
+    try {
+      await adminSignIn(email.trim(), password);
+      onDone();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "로그인하지 못했어요");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="grid min-h-dvh place-items-center bg-[#f3efe8] px-5">
+      <form onSubmit={submit} className="w-full max-w-[360px] space-y-3 rounded-2xl border border-line bg-white p-6">
+        <div className="flex items-center gap-3 pb-2">
+          <Logo small />
+          <span className="rounded-md bg-navy px-2 py-1 text-[12px] font-bold text-white">운영 콘솔</span>
+        </div>
+        <TextField label="이메일" type="email" autoComplete="username" value={email} onChange={(e) => setEmail(e.target.value)} required />
+        <TextField
+          label="비밀번호"
+          type="password"
+          autoComplete="current-password"
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+          required
+        />
+        {error ? <p className="text-[13px] font-semibold text-[#c2412d]">{error}</p> : null}
+        <Button type="submit" className="w-full" size="md" disabled={busy}>
+          로그인
+        </Button>
+      </form>
+    </div>
+  );
+}
+
 export default function AdminBoard() {
   const isClient = useIsClient();
   const store = useStore();
   const [seedStatus, setSeedStatus] = useState<Record<string, OrderStatus>>({});
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
+  // 서버 모드: admin이 null이면 로그인 확인 중, server는 모든 손님의 주문
+  const [admin, setAdmin] = useState<boolean | null>(null);
+  const [server, setServer] = useState<State | null>(null);
+  const [form, setForm] = useState(EMPTY_FORM);
+  const [busy, setBusy] = useState(false);
 
-  const items = [...(isClient ? liveItems(store) : []), ...seedItems(seedStatus)];
+  const reload = useCallback(() => pullAll().then(setServer).catch(() => setToast("주문을 불러오지 못했어요")), []);
+
+  useEffect(() => {
+    if (backendOn) void isAdmin().then(setAdmin);
+  }, []);
+
+  useEffect(() => {
+    if (!admin) return;
+    void reload();
+    return watchAll(() => void reload());
+  }, [admin, reload]);
+
+  if (backendOn && admin === false) return <AdminLogin onDone={() => setAdmin(true)} />;
+
+  const items = backendOn
+    ? server
+      ? liveItems(server)
+      : []
+    : [...(isClient ? liveItems(store) : []), ...seedItems(seedStatus)];
   const selected = items.find((i) => i.key === selectedKey) ?? null;
   const active = items.filter((i) => i.status !== "DELIVERED").length;
 
@@ -112,11 +214,61 @@ export default function AdminBoard() {
     window.setTimeout(() => setToast(null), 2600);
   };
 
-  const advance = (item: BoardItem, to: OrderStatus) => {
-    if (item.live && item.orderId) dispatch({ type: "order/status", id: item.orderId, status: to, at: nowMs() });
+  const select = (key: string | null) => {
+    setSelectedKey(key);
+    setForm(EMPTY_FORM);
+  };
+
+  const download = () =>
+    downloadDataUrl(
+      URL.createObjectURL(new Blob([boardCsv(items)], { type: "text/csv;charset=utf-8" })),
+      `리폼편의점_주문_${kst(nowMs()).slice(0, 10)}.csv`,
+    );
+
+  const advance = async (item: BoardItem, to: OrderStatus, patch: Record<string, unknown> = {}) => {
+    if (backendOn && item.orderId) {
+      setBusy(true);
+      try {
+        await updateOrder(item.orderId, { status: to, ...patch });
+        await reload();
+      } catch (e) {
+        return flash(e instanceof Error ? e.message : "상태를 바꾸지 못했어요");
+      } finally {
+        setBusy(false);
+      }
+    } else if (item.live && item.orderId) dispatch({ type: "order/status", id: item.orderId, status: to, at: nowMs() });
     else setSeedStatus((s) => ({ ...s, [item.key]: to }));
     flash(`${item.orderNo} → ${STATUS_LABEL[to]}`);
   };
+
+  /** 입고 검수를 마치고 실물 사진(선택)과 메모로 손님 승인을 요청한다 */
+  const confirm = async (item: BoardItem) => {
+    if (!item.order) return;
+    setBusy(true);
+    try {
+      const photo = form.photo ? await (await fetch((await preparePhoto(form.photo)).dataUrl)).blob() : null;
+      await sendConfirm(item.order, photo, form.note);
+      await reload();
+      setForm(EMPTY_FORM);
+      flash(`${item.orderNo} → ${STATUS_LABEL.AWAITING_APPROVAL}`);
+    } catch (e) {
+      flash(e instanceof Error ? e.message : "확정 시안을 보내지 못했어요");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const kpis = backendOn
+    ? [
+        { label: "진행 중 주문", value: `${active}건` },
+        { label: "전체 주문", value: `${items.length}건` },
+      ]
+    : [
+        { label: "오늘 만든 시안", value: "128건" },
+        { label: "시안에서 주문까지", value: "6.2%" },
+        { label: "첫 시안 평균", value: "23초" },
+        { label: "진행 중 주문", value: `${active}건` },
+      ];
 
   return (
     <div className="min-h-dvh bg-[#f3efe8]">
@@ -124,7 +276,7 @@ export default function AdminBoard() {
         <div className="mx-auto flex h-16 max-w-[1400px] items-center gap-4 px-5">
           <Logo small />
           <span className="rounded-md bg-navy px-2 py-1 text-[12px] font-bold text-white">운영 콘솔</span>
-          <DemoTag>시안</DemoTag>
+          {backendOn ? null : <DemoTag>시안</DemoTag>}
           <nav className="ml-4 hidden items-center gap-1 text-[14px] md:flex">
             <span className="inline-flex items-center gap-1.5 rounded-lg bg-[#f1ece4] px-3 py-1.5 font-semibold">
               <LayoutGrid size={16} /> 주문 보드
@@ -144,6 +296,19 @@ export default function AdminBoard() {
             <Link href="/" className="inline-flex items-center gap-1 text-[13px] font-semibold text-muted hover:text-ink">
               고객 화면 <ExternalLink size={13} />
             </Link>
+            {backendOn && admin ? (
+              <button
+                type="button"
+                onClick={async () => {
+                  await adminSignOut();
+                  setServer(null);
+                  setAdmin(false);
+                }}
+                className="inline-flex items-center gap-1 text-[13px] font-semibold text-muted hover:text-ink"
+              >
+                <LogOut size={14} /> 로그아웃
+              </button>
+            ) : null}
           </div>
         </div>
       </header>
@@ -154,18 +319,16 @@ export default function AdminBoard() {
             <h1 className="text-[24px] font-extrabold tracking-[-0.02em]">주문 보드</h1>
             <p className="mt-1 text-[14px] text-muted">고객 화면에서 주문하면 이 보드의 맨 앞에 바로 나타나요.</p>
           </div>
-          <div className="flex items-center gap-1.5 text-[12px] text-muted">
-            <DemoTag>예시 수치</DemoTag>
+          <div className="flex items-center gap-2 text-[12px] text-muted">
+            {backendOn ? null : <DemoTag>예시 수치</DemoTag>}
+            <Button variant="secondary" size="sm" disabled={items.length === 0} onClick={download}>
+              <Download size={15} /> 엑셀로 내려받기
+            </Button>
           </div>
         </div>
 
         <div className="mt-4 grid grid-cols-2 gap-3 md:grid-cols-4">
-          {[
-            { label: "오늘 만든 시안", value: "128건" },
-            { label: "시안에서 주문까지", value: "6.2%" },
-            { label: "첫 시안 평균", value: "23초" },
-            { label: "진행 중 주문", value: `${active}건` },
-          ].map((k) => (
+          {kpis.map((k) => (
             <div key={k.label} className="rounded-2xl border border-line bg-white px-4 py-3">
               <div className="text-[12.5px] text-muted">{k.label}</div>
               <div className="mt-0.5 text-[22px] font-extrabold tracking-[-0.01em]">{k.value}</div>
@@ -187,7 +350,7 @@ export default function AdminBoard() {
                     <li key={item.key}>
                       <button
                         type="button"
-                        onClick={() => setSelectedKey(item.key)}
+                        onClick={() => select(item.key)}
                         className={cx(
                           "flex w-full gap-2.5 rounded-xl border bg-white p-2.5 text-left transition hover:shadow-md",
                           item.live ? "border-accent/60" : "border-line",
@@ -221,7 +384,7 @@ export default function AdminBoard() {
       </main>
 
       {selected ? (
-        <div className="fixed inset-0 z-40 flex justify-end bg-black/30" onClick={() => setSelectedKey(null)}>
+        <div className="fixed inset-0 z-40 flex justify-end bg-black/30" onClick={() => select(null)}>
           <aside
             className="flex h-full w-full max-w-[440px] flex-col overflow-y-auto bg-white shadow-2xl"
             onClick={(e) => e.stopPropagation()}
@@ -232,7 +395,7 @@ export default function AdminBoard() {
                 <div className="text-[12px] text-muted">작업지시서 · {selected.orderNo}</div>
                 <div className="text-[17px] font-bold">{selected.design.name}</div>
               </div>
-              <button type="button" onClick={() => setSelectedKey(null)} aria-label="닫기" className="grid h-9 w-9 place-items-center rounded-full hover:bg-black/5">
+              <button type="button" onClick={() => select(null)} aria-label="닫기" className="grid h-9 w-9 place-items-center rounded-full hover:bg-black/5">
                 <X size={20} />
               </button>
             </div>
@@ -244,9 +407,40 @@ export default function AdminBoard() {
               <div className="mx-auto w-[62%]">
                 <MockupStage garment={selected.garment} layers={[{ designSlug: selected.design.slug, options: selected.options }]} />
               </div>
+              {selected.order?.confirmPhoto ? (
+                <figure className="mx-auto w-[62%]">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={selected.order.confirmPhoto} alt="보낸 확정 사진" className="w-full rounded-xl" />
+                  <figcaption className="mt-1 text-center text-[12px] text-muted">손님에게 보낸 실물 사진</figcaption>
+                </figure>
+              ) : null}
               <dl className="grid grid-cols-[88px_1fr] gap-x-3 gap-y-2 rounded-2xl bg-[#f7f4ee] p-4 text-[13.5px]">
                 <dt className="text-muted">고객</dt>
-                <dd>{selected.customer}</dd>
+                <dd>{selected.order?.customer.name ?? selected.customer}</dd>
+                {selected.order ? (
+                  <>
+                    <dt className="text-muted">연락처</dt>
+                    <dd>{selected.order.customer.phone}</dd>
+                    <dt className="text-muted">주소</dt>
+                    <dd>{selected.order.customer.address}</dd>
+                  </>
+                ) : null}
+                {selected.order?.tracking ? (
+                  <>
+                    <dt className="text-muted">받는 택배</dt>
+                    <dd>
+                      {selected.order.tracking.carrier} · {selected.order.tracking.number}
+                    </dd>
+                  </>
+                ) : null}
+                {selected.order?.outbound ? (
+                  <>
+                    <dt className="text-muted">보낸 택배</dt>
+                    <dd>
+                      {selected.order.outbound.carrier} · {selected.order.outbound.number}
+                    </dd>
+                  </>
+                ) : null}
                 <dt className="text-muted">의류</dt>
                 <dd>
                   {CATEGORY_LABEL[selected.garment.category]} · {selected.garment.colorName}
@@ -294,14 +488,70 @@ export default function AdminBoard() {
               </div>
             </div>
             <div className="mt-auto border-t border-line px-5 py-4">
-              {ACTION[selected.status] ? (
-                <Button className="w-full" size="md" onClick={() => advance(selected, nextStatus(selected.status) ?? selected.status)}>
+              {backendOn && selected.status === "INSPECTING" ? (
+                <div className="space-y-2">
+                  <label className="block text-[12.5px] font-semibold">
+                    실물 사진 (선택)
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={(e) => setForm({ ...form, photo: e.target.files?.[0] ?? null })}
+                      className="mt-1 block w-full text-[13px] font-normal"
+                    />
+                  </label>
+                  <textarea
+                    value={form.note}
+                    onChange={(e) => setForm({ ...form, note: e.target.value })}
+                    placeholder="손님에게 전할 말 (예: 왼쪽 가슴 6cm로 맞췄어요)"
+                    className="h-20 w-full resize-none rounded-xl border border-line p-3 text-[13.5px] outline-none focus:border-ink"
+                  />
+                  <Button className="w-full" size="md" disabled={busy} onClick={() => confirm(selected)}>
+                    검수 완료 · 확정 시안 보내기
+                  </Button>
+                </div>
+              ) : backendOn && selected.status === "IN_PROGRESS" ? (
+                <div className="space-y-2">
+                  <div className="grid grid-cols-[1fr_1.3fr] gap-2">
+                    <select
+                      value={form.carrier}
+                      onChange={(e) => setForm({ ...form, carrier: e.target.value })}
+                      aria-label="돌려보낼 택배사"
+                      className="h-11 w-full min-w-0 rounded-xl border border-line bg-white px-3 text-[13.5px] outline-none focus:border-ink"
+                    >
+                      {CARRIERS.map((c) => (
+                        <option key={c}>{c}</option>
+                      ))}
+                    </select>
+                    <input
+                      value={form.number}
+                      onChange={(e) => setForm({ ...form, number: e.target.value.replace(/[^0-9 -]/g, "") })}
+                      inputMode="numeric"
+                      placeholder="출고 송장 번호"
+                      aria-label="출고 송장 번호"
+                      className="h-11 w-full min-w-0 rounded-xl border border-line px-3 text-[13.5px] outline-none focus:border-ink"
+                    />
+                  </div>
+                  <Button
+                    className="w-full"
+                    size="md"
+                    disabled={busy || form.number.replace(/\D/g, "").length < 8}
+                    onClick={() => advance(selected, "OUTBOUND_TRANSIT", { outbound: { carrier: form.carrier, number: form.number.trim() } })}
+                  >
+                    작업 완료 · 출고
+                  </Button>
+                </div>
+              ) : ACTION[selected.status] ? (
+                <Button className="w-full" size="md" disabled={busy} onClick={() => advance(selected, nextStatus(selected.status) ?? selected.status)}>
                   {ACTION[selected.status]}
                 </Button>
               ) : selected.status === "AWAITING_SHIPMENT" ? (
-                <Button className="w-full" size="md" variant="secondary" onClick={() => flash("고객에게 발송 안내 알림톡을 다시 보냈어요 (시안)")}>
-                  발송 안내 다시 보내기
-                </Button>
+                backendOn ? (
+                  <p className="text-center text-[13px] text-muted">손님이 택배를 보내고 송장을 넣으면 ‘입고 중’으로 넘어와요</p>
+                ) : (
+                  <Button className="w-full" size="md" variant="secondary" onClick={() => flash("고객에게 발송 안내 알림톡을 다시 보냈어요 (시안)")}>
+                    발송 안내 다시 보내기
+                  </Button>
+                )
               ) : selected.status === "AWAITING_APPROVAL" ? (
                 <div className="space-y-2">
                   <p className="text-center text-[13px] text-muted">고객이 확정 시안에 답하기를 기다리고 있어요</p>

@@ -6,10 +6,11 @@ import { useState } from "react";
 import { BottomBar, Missing, PhoneFrame, ScreenSkeleton, TopBar } from "@/components/app-frame";
 import { MockupStage } from "@/components/mockup-stage";
 import { Button, Card, DemoTag, Label, TextField } from "@/components/ui";
+import { backendOn, placeOrder } from "@/lib/db";
 import { colorOf, designBySlug } from "@/lib/designs";
 import { cx, newId, won, nowMs } from "@/lib/format";
 import { PLACEMENT_LABEL } from "@/lib/garments";
-import { dispatch, useIsClient, useStore } from "@/lib/store";
+import { dispatch, refresh, useIsClient, useStore } from "@/lib/store";
 import type { Order } from "@/lib/types";
 
 const METHODS = [
@@ -31,6 +32,7 @@ export default function CheckoutScreen() {
   const [method, setMethod] = useState("card");
   const [paying, setPaying] = useState(false);
   const [loggingIn, setLoggingIn] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const quote = quotes[quoteId];
   const session = quote ? sessions[quote.sessionId] : undefined;
@@ -51,9 +53,22 @@ export default function CheckoutScreen() {
     }, 700);
   };
 
-  const pay = () => {
+  const pay = async () => {
     if (!ready) return;
     setPaying(true);
+    setError(null);
+    if (backendOn) {
+      try {
+        const order = await placeOrder({ garment, session, quote, customer: form, consents: agree });
+        dispatch({ type: "order/add", order });
+        void refresh();
+        router.replace(`/orders/${order.id}`);
+      } catch (e) {
+        setError(e instanceof Error ? e.message : "주문을 만들지 못했어요");
+        setPaying(false);
+      }
+      return;
+    }
     window.setTimeout(() => {
       const now = nowMs();
       const d = new Date(now);
@@ -223,6 +238,7 @@ export default function CheckoutScreen() {
       </section>
 
       <BottomBar>
+        {error ? <p className="mb-2 text-center text-[13px] font-semibold text-[#c2412d]">{error}</p> : null}
         <Button className="w-full" disabled={!ready || paying} onClick={pay}>
           {paying ? (
             <>
