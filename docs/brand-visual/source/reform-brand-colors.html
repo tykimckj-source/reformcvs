@@ -1,0 +1,67 @@
+<div id="reform-colors" aria-label="리폼편의점 브랜드 색상 비교">
+  <style>
+    #reform-colors {font-family:Arial,'Malgun Gothic',sans-serif;color:#303236;background:#fff;padding:24px;box-sizing:border-box;--lilac:#DFCCE9;--teal:#164E46;}
+    #reform-colors * {box-sizing:border-box;}
+    #reform-colors .base {display:flex;gap:20px;flex-wrap:wrap;margin-bottom:24px;padding-right:70px;font-size:13px;}
+    #reform-colors .base span {display:flex;align-items:center;gap:8px;}
+    #reform-colors .dot {width:22px;height:22px;border-radius:50%;border:1px solid #d8d8d8;display:inline-block;}
+    #reform-colors .options {display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;}
+    #reform-colors .choice {appearance:none;background:#fff;color:#303236;border:1px solid #e4e4e4;border-radius:12px;padding:16px;text-align:left;font:inherit;min-width:0;}
+    #reform-colors .choice[aria-pressed=true] {border:2px solid #303236;padding:15px;}
+    #reform-colors .name {font-size:15px;font-weight:600;display:block;margin-bottom:12px;}
+    #reform-colors .pair {display:grid;grid-template-columns:1fr 1fr;gap:8px;}
+    #reform-colors .swatch {display:block;height:64px;border-radius:6px;}
+    #reform-colors .hex {display:block;font-size:12px;margin-top:7px;letter-spacing:.03em;}
+    #reform-colors .note {display:block;font-size:12px;margin-top:12px;color:#595d62;line-height:1.5;}
+    #reform-colors .sample {margin-top:24px;padding-top:22px;border-top:1px solid #e7e7e7;}
+    #reform-colors .samplehead {display:flex;justify-content:space-between;align-items:center;gap:12px;font-size:12px;color:#595d62;margin-bottom:22px;}
+    #reform-colors .brand {font-size:20px;font-weight:700;letter-spacing:-.05em;color:#303236;}
+    #reform-colors .brand b {display:inline-block;width:9px;height:9px;border-radius:50%;background:var(--lilac);margin-left:5px;}
+    #reform-colors h2 {font-size:26px;letter-spacing:-.04em;line-height:1.35;margin:0;color:#303236;font-weight:600;}
+    #reform-colors .badge {display:inline-block;background:var(--lilac);color:#303236;border-radius:20px;padding:6px 11px;margin-bottom:12px;font-size:12px;}
+    #reform-colors .sampleline {display:flex;align-items:center;gap:20px;flex-wrap:wrap;margin-top:22px;}
+    #reform-colors .cta {display:inline-block;padding:11px 17px;background:var(--teal);color:#fff;border-radius:8px;font-size:14px;}
+    #reform-colors .smalllink {color:var(--teal);font-size:13px;}
+    #reform-colors .proportion {height:12px;margin-top:24px;display:flex;border-radius:3px;overflow:hidden;border:1px solid #ececec;}
+    #reform-colors .proportion span:nth-child(1){width:85%;background:#fff;}
+    #reform-colors .proportion span:nth-child(2){width:8%;background:#303236;}
+    #reform-colors .proportion span:nth-child(3){width:4%;background:var(--lilac);}
+    #reform-colors .proportion span:nth-child(4){width:3%;background:var(--teal);}
+    #reform-colors .ratio {font-size:12px;color:#595d62;line-height:1.6;margin-top:8px;}
+    @media(max-width:420px){#reform-colors{padding:14px;}#reform-colors .options{gap:10px;}#reform-colors .choice{padding:10px;}#reform-colors .choice[aria-pressed=true]{padding:9px;}#reform-colors .name{font-size:13px;}#reform-colors .samplehead{align-items:start;flex-direction:column;}}
+  </style>
+  <div class="base"><span><i class="dot" style="background:#FFFFFF"></i>화이트 #FFFFFF</span><span><i class="dot" style="background:#303236"></i>차콜 #303236</span></div>
+  <div class="options" aria-label="포인트 색 조합 선택">
+    <button type="button" class="choice cursor-interaction" data-choice="0" aria-pressed="true"><span class="name">A · 소프트 라일락</span><span class="pair"><span><i class="swatch" style="background:#DFCCE9"></i><span class="hex">#DFCCE9</span></span><span><i class="swatch" style="background:#164E46"></i><span class="hex">#164E46</span></span></span><span class="note">은은한 붉은 보라 · 차분한 초록 청록</span></button>
+    <button type="button" class="choice cursor-interaction" data-choice="1" aria-pressed="false"><span class="name">B · 로지 라일락</span><span class="pair"><span><i class="swatch" style="background:#E4CDE4"></i><span class="hex">#E4CDE4</span></span><span><i class="swatch" style="background:#195950"></i><span class="hex">#195950</span></span></span><span class="note">붉은 기가 조금 더 · 조금 밝은 청록</span></button>
+    <button type="button" class="choice cursor-interaction" data-choice="2" aria-pressed="false"><span class="name">C · 클리어 모브</span><span class="pair"><span><i class="swatch" style="background:#D8BFE2"></i><span class="hex">#D8BFE2</span></span><span><i class="swatch" style="background:#10483F"></i><span class="hex">#10483F</span></span></span><span class="note">조금 선명한 보라 · 깊고 짙은 청록</span></button>
+    <button type="button" class="choice cursor-interaction" data-choice="3" aria-pressed="false"><span class="name">D · 밀키 라일락</span><span class="pair"><span><i class="swatch" style="background:#E9D9EF"></i><span class="hex">#E9D9EF</span></span><span><i class="swatch" style="background:#28594D"></i><span class="hex">#28594D</span></span></span><span class="note">흰색이 더 섞인 보라 · 초록 기가 더</span></button>
+  </div>
+  <section class="sample" aria-label="선택 색상 적용 예시">
+    <div class="samplehead"><span class="brand">리폼편의점<b aria-hidden="true"></b></span><span id="reform-color-selected" aria-live="polite">A · 소프트 라일락 적용 예시</span></div>
+    <span class="badge">내 취향으로, 가볍게</span>
+    <h2>입던 옷에<br>새로운 즐거움을.</h2>
+    <div class="sampleline"><span class="cta">내 옷 꾸며보기 →</span><span class="smalllink">리폼 이야기 보기</span></div>
+    <div class="proportion" role="img" aria-label="예시 비중: 화이트 85%, 차콜 8%, 보라 4%, 청록 3%"><span></span><span></span><span></span><span></span></div>
+    <div class="ratio">예시 비중 · 화이트 85 / 차콜 8 / 보라 4 / 청록 3</div>
+  </section>
+</div>
+<script>
+(()=>{
+  const root=document.getElementById('reform-colors');
+  const palettes=[['A · 소프트 라일락','#DFCCE9','#164E46'],['B · 로지 라일락','#E4CDE4','#195950'],['C · 클리어 모브','#D8BFE2','#10483F'],['D · 밀키 라일락','#E9D9EF','#28594D']];
+  function render(index){
+    if(!Number.isInteger(index)||!palettes[index])index=0;
+    const p=palettes[index];
+    root.style.setProperty('--lilac',p[1]);root.style.setProperty('--teal',p[2]);
+    root.querySelector('#reform-color-selected').textContent=p[0]+' 적용 예시';
+    root.querySelectorAll('[data-choice]').forEach(b=>b.setAttribute('aria-pressed',String(Number(b.dataset.choice)===index)));
+  }
+  render(window.openai?.widgetState?.modelContent?.paletteIndex??0);
+  root.querySelectorAll('[data-choice]').forEach(b=>b.addEventListener('click',()=>{
+    const index=Number(b.dataset.choice);render(index);
+    if(window.openai?.setWidgetState)window.openai.setWidgetState({modelContent:{paletteIndex:index,palette:palettes[index]},privateContent:null}).catch(()=>{});
+  }));
+  window.addEventListener('openai:set_globals',e=>{const s=e.detail?.globals?.widgetState;if(s)render(s.modelContent?.paletteIndex??0);});
+})();
+</script>
