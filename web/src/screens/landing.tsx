@@ -66,10 +66,15 @@ export default function Landing() {
       </section>
 
         <div className="px-5">
+          <Link href="/cases/indigo-ocean" className="mt-3 flex items-center gap-4 rounded-[20px] border border-line bg-white p-3">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/cases/indigo-ocean/after-front.png" alt="쪽염색과 고양이·고래 원단 패치로 리폼한 티셔츠" className="h-24 w-24 rounded-xl object-contain" />
+            <div className="flex-1"><p className="text-[11px] font-bold text-[#53634b]">쪽염색과 원단 패치 리폼</p><p className="mt-1 text-[15px] font-semibold">오래된 흰 티셔츠,<br />쪽빛 바다를 입다</p><p className="mt-2 text-xs text-muted">앞면·뒷면 비포 애프터 보기 →</p></div>
+          </Link>
           <Link href="/cases/denim-skirt" className="mt-3 flex items-center gap-4 rounded-[20px] border border-line bg-white p-3">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src="/cases/denim-skirt/after-front.png" alt="바지 두 벌을 재구성한 긴 청치마" className="h-24 w-24 rounded-xl object-contain" />
-            <div className="flex-1"><p className="text-[11px] font-bold text-[#53634b]">해체와 재구성 리폼</p><p className="mt-1 text-[15px] font-semibold">바지 두 벌,<br />하나의 청치마</p><p className="mt-2 text-xs text-muted">앞면·뒷면과 디테일 보기 →</p></div>
+            <div className="flex-1"><p className="text-[11px] font-bold text-[#53634b]">해체와 재구성 리폼</p><p className="mt-1 text-[15px] font-semibold">바지 두 벌,<br />하나의 청치마</p><p className="mt-2 text-xs text-muted">앞면·뒷면 비포 애프터 보기 →</p></div>
           </Link>
           <Link href="/cases/white-stamp" className="mt-3 flex items-center gap-4 rounded-[20px] border border-line bg-white p-3">
             {/* eslint-disable-next-line @next/next/no-img-element */}
