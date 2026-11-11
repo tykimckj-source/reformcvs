@@ -66,6 +66,16 @@ export default function Landing() {
       </section>
 
         <div className="px-5">
+          <Link href="/cases/transfer-sweatshirt" className="mt-3 flex items-center gap-4 rounded-[20px] border border-line bg-white p-3">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/cases/transfer-sweatshirt/after-front.png" alt="자연 모티프 전사지로 꾸민 흰 맨투맨" className="h-24 w-24 rounded-xl object-contain" />
+            <div className="flex-1"><p className="text-[11px] font-bold text-[#53634b]">전사지로 이염 가리기</p><p className="mt-1 text-[15px] font-semibold">이염 위에 더한<br />작은 그림들</p><p className="mt-2 text-xs text-muted">비포 애프터 · 전사지 3종 보기 →</p></div>
+          </Link>
+          <Link href="/cases/black-wide" className="mt-3 flex items-center gap-4 rounded-[20px] border border-line bg-white p-3">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/cases/black-wide/after-front.png" alt="블루 원단으로 통을 넓힌 블랙 팬츠" className="h-24 w-24 rounded-xl object-contain" />
+            <div className="flex-1"><p className="text-[11px] font-bold text-[#53634b]">바지통 확장과 스텐실 리폼</p><p className="mt-1 text-[15px] font-semibold">블랙 팬츠에 더한<br />여유와 바다</p><p className="mt-2 text-xs text-muted">앞면·뒷면 비포 애프터 보기 →</p></div>
+          </Link>
           <Link href="/cases/indigo-ocean" className="mt-3 flex items-center gap-4 rounded-[20px] border border-line bg-white p-3">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src="/cases/indigo-ocean/after-front.png" alt="쪽염색과 고양이·고래 원단 패치로 리폼한 티셔츠" className="h-24 w-24 rounded-xl object-contain" />

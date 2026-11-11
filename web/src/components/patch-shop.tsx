@@ -8,6 +8,9 @@ import publishedCatalog from "@/data/patch-catalog.json";
 
 export type Product = { id: string; name: string; category: "눈 모양" | "장식 패치" | "전사지"; box: [number, number, number, number]; back?: boolean; image?: string; cost?: number };
 const baseProducts: Product[] = [
+  { id: "sheet-nature", name: "자연 모티프 전사지", category: "전사지", box: [0, 0, 1, 1], image: "/transfers/nature.jpg", cost: 12000 },
+  { id: "sheet-hangul", name: "한글 전사지", category: "전사지", box: [0, 0, 1, 1], image: "/transfers/hangul.jpg", cost: 12000 },
+  { id: "sheet-pebbles", name: "돌멩이 문구 전사지", category: "전사지", box: [0, 0, 1, 1], image: "/transfers/pebbles.jpg", cost: 12000 },
   { id: "eyes-lash", name: "속눈썹 눈 모양", category: "눈 모양", box: [125, 200, 190, 186] },
   { id: "eyes-up", name: "위쪽을 보는 눈", category: "눈 모양", box: [681, 167, 213, 151] },
   { id: "eyes-round", name: "동그란 눈", category: "눈 모양", box: [794, 456, 183, 154] },
@@ -33,7 +36,7 @@ const baseProducts: Product[] = [
   { id: "green-car", name: "초록 자동차", category: "장식 패치", box: [707, 1167, 218, 186] },
   { id: "sewing", name: "I’M OK 재봉 도구", category: "전사지", box: [265, 512, 535, 510], back: true },
 ];
-const price = (p: Product) => p.cost ?? (p.back ? 3000 : 1000);
+const price = (p: Product) => p.cost ?? (p.category === "전사지" ? 12000 : 1000);
 const won = (n: number) => `${n.toLocaleString("ko-KR")}원`;
 
 const catalogKey = "reformcvs-patch-catalog-v1";
@@ -64,7 +67,7 @@ function DetailImage({ product }: { product: Product }) {
   </div></div>;
 }
 
-export function PatchShop({ catalog = false, editor = false }: { catalog?: boolean; editor?: boolean }) {
+export function PatchShop({ catalog = false, editor = false, transferOnly = false }: { catalog?: boolean; editor?: boolean; transferOnly?: boolean }) {
   const stored = useSyncExternalStore(subscribe, snapshot, () => "[]");
   const custom = useMemo(() => {
     const published = readProducts(JSON.stringify(publishedCatalog));
@@ -72,7 +75,7 @@ export function PatchShop({ catalog = false, editor = false }: { catalog?: boole
     const drafts = readProducts(stored);
     return [...published.filter(p => !drafts.some(d => d.id === p.id)), ...drafts];
   }, [stored, editor]);
-  const products = useMemo(() => [...baseProducts.map(p => custom.find(c => c.id === p.id) || p), ...custom.filter(p => !baseProducts.some(b => b.id === p.id))], [custom]);
+  const products = useMemo(() => [...baseProducts.map(p => custom.find(c => c.id === p.id) || p), ...custom.filter(p => !baseProducts.some(b => b.id === p.id))].filter(p => !transferOnly || p.id.startsWith("sheet-")), [custom, transferOnly]);
   const [filter, setFilter] = useState("전체");
   const [quantities, setQuantities] = useState<Record<string, number>>({});
   const [includeRecut, setIncludeRecut] = useState(false);
@@ -86,9 +89,9 @@ export function PatchShop({ catalog = false, editor = false }: { catalog?: boole
   const cartTotal = cartProducts.reduce((sum, p) => sum + price(p) * (cart?.quantities[p.id] || 0), cart?.recut ? 29000 : 0);
   return <section id="patch-shop" className="mx-5 mt-9 scroll-mt-5 border-t border-line pt-7" aria-labelledby="patch-shop-title">
     <p className="text-[11px] font-bold tracking-widest text-[#53634b]">CHOOSE YOUR PATCH</p>
-    <h2 id="patch-shop-title" className="mt-2 text-[23px] font-bold">사진 속 장식 골라 담기</h2>
-    <p className="mt-3 text-sm leading-6 text-muted">눈 모양부터 컬러 패치, 뒷판 전사지까지. 원하는 디자인만 선택하고, 다른 패치를 함께 담아 나만의 조합을 만들어 보세요.</p>
-    <p className="mt-2 text-xs leading-5 text-muted">사진을 바탕으로 배경을 제거한 참고 이미지입니다. 실제 크기·소재·재고·부착 방식은 판매 전 확인 예정입니다.</p>
+    <h2 id="patch-shop-title" className="mt-2 text-[23px] font-bold">{transferOnly ? "전사지 3종 골라 담기" : "사진 속 장식 골라 담기"}</h2>
+    <p className="mt-3 text-sm leading-6 text-muted">{transferOnly ? "자연 모티프·한글·돌멩이 문구 전사지 중 골라 보세요. 시트 1장당 12,000원입니다." : "눈 모양부터 컬러 패치, 전사지까지. 원하는 디자인과 수량을 골라 보세요."}</p>
+    <p className="mt-2 text-xs leading-5 text-muted">전사지 3종은 제공된 시트 사진입니다. 실제 크기·소재·재고·부착 방식은 판매 전 확인 예정입니다.</p>
     {!catalog && <Link href="/patches" className="my-4 block rounded-xl border border-line bg-white px-4 py-3 text-sm font-semibold">패치 모음 · 선택·금액 계산 →</Link>}
     {editor && <div className="mt-5"><PatchManager products={products} changes={custom} save={p => {
       localStorage.setItem(catalogKey, JSON.stringify([...custom.filter(c => c.id !== p.id), p]));
@@ -97,14 +100,14 @@ export function PatchShop({ catalog = false, editor = false }: { catalog?: boole
       localStorage.setItem(catalogKey, JSON.stringify(custom.filter(c => c.id !== id)));
       window.dispatchEvent(new Event("patch-catalog-change")); setCart(null); setReview(false); setQuantities(q => ({ ...q, [id]: 0 }));
     }} /></div>}
-    <div aria-label="장식 종류" className="my-5 flex flex-wrap gap-2">{["전체", "눈 모양", "장식 패치", "전사지"].map(f => <button key={f} type="button" aria-pressed={filter === f} onClick={() => setFilter(f)} className={`min-h-10 rounded-full border px-3 text-xs font-semibold ${filter === f ? "border-[#293e32] bg-[#293e32] text-white" : "border-line bg-white"}`}>{f}</button>)}</div>
+    {!transferOnly && <div aria-label="장식 종류" className="my-5 flex flex-wrap gap-2">{["전체", "눈 모양", "장식 패치", "전사지"].map(f => <button key={f} type="button" aria-pressed={filter === f} onClick={() => setFilter(f)} className={`min-h-10 rounded-full border px-3 text-xs font-semibold ${filter === f ? "border-[#293e32] bg-[#293e32] text-white" : "border-line bg-white"}`}>{f}</button>)}</div>}
     <div className="grid grid-cols-2 gap-x-3 gap-y-5">{products.filter(p => filter === "전체" || p.category === filter).map(p => <article key={p.id}>
       <DetailImage product={p} />
-      <p className="mt-2 text-[11px] text-muted">{p.category}</p><h3 className="text-sm font-semibold">{p.name}</h3><p className="mt-1 text-sm font-bold">{won(price(p))}<span className="ml-1 text-[11px] font-normal text-muted">/ 개</span></p>
+      <p className="mt-2 text-[11px] text-muted">{p.category}</p><h3 className="text-sm font-semibold">{p.name}</h3><p className="mt-1 text-sm font-bold">{won(price(p))}<span className="ml-1 text-[11px] font-normal text-muted">/ {p.id.startsWith("sheet-") ? "장" : "개"}</span></p>
       <div className="mt-2 flex min-h-10 items-center justify-between rounded-lg border border-line bg-white"><button type="button" aria-label={`${p.name} 수량 줄이기`} disabled={!quantities[p.id]} onClick={() => change(p.id, -1)} className="h-11 w-11 disabled:opacity-25">−</button><output aria-label={`${p.name} 선택 수량`} className="text-sm font-semibold">{quantities[p.id] || 0}</output><button type="button" aria-label={`${p.name} 선택 추가`} disabled={quantities[p.id] >= 99} onClick={() => change(p.id, 1)} className="h-11 w-11 disabled:opacity-25">＋</button></div>
     </article>)}</div>
     <div className="mt-7 rounded-2xl bg-white p-4">
-      <label className="flex items-start gap-3 text-sm"><input type="checkbox" checked={includeRecut} onChange={e => { setIncludeRecut(e.target.checked); setMessage(""); }} className="mt-1 h-4 w-4" /><span><strong>디자인 변경도 함께 선택</strong><span className="mt-1 block text-xs leading-5 text-muted">소매 재단·몸판 폭 변경 · 29,000원<br />선택하지 않으면 장식만 담습니다.</span></span></label>
+      {!transferOnly && <label className="flex items-start gap-3 text-sm"><input type="checkbox" checked={includeRecut} onChange={e => { setIncludeRecut(e.target.checked); setMessage(""); }} className="mt-1 h-4 w-4" /><span><strong>디자인 변경도 함께 선택</strong><span className="mt-1 block text-xs leading-5 text-muted">소매 재단·몸판 폭 변경 · 29,000원<br />선택하지 않으면 장식만 담습니다.</span></span></label>}
       <h3 className="mt-5 font-semibold">현재 선택</h3>
       {!selected.length && !includeRecut ? <p className="mt-2 text-sm text-muted">마음에 드는 장식의 ＋를 눌러 주세요.</p> : <ul className="mt-3 space-y-2 text-sm">{selected.map(p => <li key={p.id} className="flex items-center justify-between gap-2"><span>{p.name} × {quantities[p.id]}</span><button type="button" onClick={() => setQuantities(q => ({ ...q, [p.id]: 0 }))} className="shrink-0 text-xs underline" aria-label={`${p.name} 선택 취소`}>빼기</button></li>)}{includeRecut && <li>디자인 변경 × 1</li>}</ul>}
       <p aria-live="polite" className="mt-5 flex justify-between border-t border-line pt-4 font-bold"><span>선택 합계</span><span>{won(total)}</span></p>
