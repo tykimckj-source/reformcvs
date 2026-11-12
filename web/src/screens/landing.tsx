@@ -58,6 +58,13 @@ export default function Landing() {
 
       <section className="px-5 pt-6">
         <RealCaseCompare />
+        <h2 className="mb-4 mt-8 text-[23px] font-bold">뒷면의 변화</h2>
+        <RealCaseCompare side="back" />
+        <Link href="/cases/blue-crop" className="mt-5 flex items-center gap-4 rounded-[20px] border border-line bg-white p-3">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/cases/blue-crop/after-front-unified.png" alt="소매를 잘라낸 짧은 파란 레이어드 조끼" className="h-24 w-24 rounded-xl object-cover object-top" />
+          <div className="flex-1"><p className="text-xs text-muted">파란 PK티 시리즈</p><p className="mt-1 font-semibold">티셔츠와 원피스 위에<br />가볍게 걸치는 크롭 조끼</p><p className="mt-2 text-xs text-muted">앞면·뒷면 비포 애프터 보기 →</p></div>
+        </Link>
         <Link href="/cases/knit-yarn" className="mt-5 flex items-center gap-4 rounded-[20px] border border-line bg-white p-3">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src="/cases/knit-yarn/after-long.png" alt="털실로 리폼한 니트 베스트" className="h-24 w-24 rounded-xl object-contain" />
@@ -68,12 +75,12 @@ export default function Landing() {
         <div className="px-5">
           <Link href="/cases/blue-eye" className="mt-3 flex items-center gap-4 rounded-[20px] border border-line bg-white p-3">
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/cases/blue-eye/after-front-matched.png" alt="눈 모양 장식과 고무줄 밑단으로 리폼한 파란 PK티" className="h-24 w-24 rounded-xl object-contain" />
+            <img src="/cases/blue-eye/after-front-matched-unified.png" alt="눈 모양 장식과 고무줄 밑단으로 리폼한 파란 PK티" className="h-24 w-24 rounded-xl object-contain" />
             <div className="flex-1"><p className="text-xs text-muted">파란 PK티 시리즈</p><p className="mt-1 font-semibold">파란 PK티에 담은 작은 시선들</p><p className="mt-2 text-xs text-muted">앞면·뒷면 비포 애프터 보기 →</p></div>
           </Link>
           <Link href="/cases/blue-zipper" className="mt-3 flex items-center gap-4 rounded-[20px] border border-line bg-white p-3">
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/cases/blue-zipper/after-front-color.png" alt="지퍼와 컬러 테이프로 리폼한 파란 PK티" className="h-24 w-24 rounded-xl object-contain" />
+            <img src="/cases/blue-zipper/after-front-color-unified.png" alt="지퍼와 컬러 테이프로 리폼한 파란 PK티" className="h-24 w-24 rounded-xl object-contain" />
             <div className="flex-1"><p className="text-xs text-muted">지퍼와 컬러 테이프 리폼</p><p className="mt-1 font-semibold">파란 PK티, 지퍼로 새롭게</p><p className="mt-2 text-xs text-muted">앞면·뒷면 비포 애프터 보기 →</p></div>
           </Link>
           <Link href="/cases/transfer-sweatshirt" className="mt-3 flex items-center gap-4 rounded-[20px] border border-line bg-white p-3">

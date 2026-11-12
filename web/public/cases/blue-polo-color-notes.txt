@@ -1,0 +1,13 @@
+Tool: built-in image_gen.
+Master color reference: blue-polo-pair.png, original plain polo on left. Original front before remains untouched.
+Prompt for every corrected asset: COLOR CORRECTION ONLY. Image 1 is the edit target. Image 2 LEFT HALF plain unmodified polo is the sole master BLUE COLOR reference (ignore image 2 right half). Match ALL base blue pique cloth of image 1, including collar, body and any sleeves, to exactly the same royal blue hue, saturation and midtone brightness of the plain original in reference 2. Remove dark navy/indigo shift or excessive electric blue saturation. Keep realistic texture, mild folds/shadows. Preserve ALL non-blue prints, patches, embroidery, lettering, studs, zippers, trims unchanged. Absolutely preserve garment silhouette, collar size, sleeve cuts, length, exact placement, scale, white margins and original canvas aspect ratio. No restyling, no new details. Output only corrected image 1, not a collage. This belongs to a uniform-color before/after series.
+Outputs:
+blue-polo-rivets-hd-unified.png
+blue-polo-back-flat-unified.png
+blue-eye/after-front-matched-unified.png
+blue-eye/after-back-matched-unified.png
+blue-zipper/after-front-color-unified.png
+blue-zipper/after-back-color-unified.png
+blue-crop/after-front-unified.png
+blue-crop/after-back-unified.png
+blue-polo-common/before-back-relaxed-unified.png

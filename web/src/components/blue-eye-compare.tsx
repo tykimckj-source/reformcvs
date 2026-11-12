@@ -10,7 +10,7 @@ export function BlueEyeCompare({ side }: { side: "front" | "back" }) {
     <div className="relative isolate aspect-square overflow-hidden rounded-[22px] bg-white focus-within:ring-2 focus-within:ring-accent">
       <svg role="img" aria-label={`눈 모양 패치 리폼 후 ${label}`} viewBox="0 0 1000 1000" className="absolute inset-0 h-full w-full">
         {/* Align collar tips and span to the before image using uniform scaling only. */}
-        <image href={`/cases/blue-eye/after-${side}-matched.png`} x="40" y={side === "front" ? 17 : 5} width="920" height="920" preserveAspectRatio="xMidYMid meet" />
+        <image href={`/cases/blue-eye/after-${side}-matched-unified.png`} x="40" y={side === "front" ? 17 : 5} width="920" height="920" preserveAspectRatio="xMidYMid meet" />
       </svg>
       <div className="absolute inset-0 bg-white" style={{ clipPath: `inset(0 ${100 - split}% 0 0)` }}>
         <svg role="img" aria-label={`리폼 전 ${label}${side === "back" ? " AI 재현" : ""}`} viewBox="0 0 1000 1000" className="h-full w-full">
@@ -19,7 +19,7 @@ export function BlueEyeCompare({ side }: { side: "front" | "back" }) {
               {/* Use exactly the same before photograph and crop as the home page. */}
               <image href="/cases/blue-polo-pair.png" width="1280" height="640" />
             </svg>
-          ) : <image href="/cases/blue-polo-common/before-back-relaxed.png" x="40" y="5" width="920" height="920" preserveAspectRatio="xMidYMid meet" />}
+          ) : <image href="/cases/blue-polo-common/before-back-relaxed-unified.png" x="40" y="5" width="920" height="920" preserveAspectRatio="xMidYMid meet" />}
         </svg>
       </div>
       <span className="pointer-events-none absolute left-3 top-3 rounded-full bg-black/65 px-3 py-2 text-[11px] font-semibold text-white">비포{side === "back" ? " 재현" : ""} · {label}</span>
