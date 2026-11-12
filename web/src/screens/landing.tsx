@@ -66,6 +66,16 @@ export default function Landing() {
       </section>
 
         <div className="px-5">
+          <Link href="/cases/blue-eye" className="mt-3 flex items-center gap-4 rounded-[20px] border border-line bg-white p-3">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/cases/blue-eye/after-front-matched.png" alt="눈 모양 장식과 고무줄 밑단으로 리폼한 파란 PK티" className="h-24 w-24 rounded-xl object-contain" />
+            <div className="flex-1"><p className="text-xs text-muted">파란 PK티 시리즈</p><p className="mt-1 font-semibold">파란 PK티에 담은 작은 시선들</p><p className="mt-2 text-xs text-muted">앞면·뒷면 비포 애프터 보기 →</p></div>
+          </Link>
+          <Link href="/cases/blue-zipper" className="mt-3 flex items-center gap-4 rounded-[20px] border border-line bg-white p-3">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/cases/blue-zipper/after-front-color.png" alt="지퍼와 컬러 테이프로 리폼한 파란 PK티" className="h-24 w-24 rounded-xl object-contain" />
+            <div className="flex-1"><p className="text-xs text-muted">지퍼와 컬러 테이프 리폼</p><p className="mt-1 font-semibold">파란 PK티, 지퍼로 새롭게</p><p className="mt-2 text-xs text-muted">앞면·뒷면 비포 애프터 보기 →</p></div>
+          </Link>
           <Link href="/cases/transfer-sweatshirt" className="mt-3 flex items-center gap-4 rounded-[20px] border border-line bg-white p-3">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src="/cases/transfer-sweatshirt/after-front.png" alt="자연 모티프 전사지로 꾸민 흰 맨투맨" className="h-24 w-24 rounded-xl object-contain" />
