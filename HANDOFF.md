@@ -124,3 +124,9 @@ Next.js 관련 수정 전 `web/AGENTS.md`와 설치된 Next.js 문서를 읽습�
 - 편집 데이터 `web/src/lib/reform-guide.ts`, 화면 `web/src/screens/reform-guide.tsx`, CSS `web/src/screens/reform-guide.css`.
 - 모바일390px/PC1440px에서 얼룩/구멍 선택, 이미지 로딩, 가로넘침 점검. TypeScript와 수정 파일 ESLint 통과. A/B 이동도 점검.
 - 고객 조사 및 구글 폼 복사 초안: `docs/customer-research-white-tee.md`. 아직 실제 Google Forms는 미생성. localhost 주소는 외부 고객에게 공유 불가.
+
+## B안 선택 흐름 개선 (2026-11-22)
+- 흰 면 티 고정, 고민 → 느낌 → 추천으로 한 단계씩 표시. 뒤로 이동/다시 선택 가능, 단계 제목으로 포커스 이동.
+- 추천은 최대2개, 핵심 한 줄과 관련 작품 링크 우선. 옷감/제한/사진 설명은 details에 유지.
+- 대표 작품3개 먼저, 기존10개 전체 펼치기. 기법은 분류 선택으로 조회. A화면과 원본 사진은 유지.
+- 모바일390px/PC1440px에서 얼룩2개·구멍1개 추천, 전체 작품 펼치기, 가로넘침 없음 확인. 미리보기만 변경, 운영 배포 없음.
