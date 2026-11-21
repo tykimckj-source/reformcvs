@@ -117,3 +117,10 @@ Next.js 관련 수정 전 `web/AGENTS.md`와 설치된 Next.js 문서를 읽습�
 - 공통 색 기준: 파란 PK티 6종은 모두 같은 원단 파랑. 염색/페인팅된 부분은 예외. blue-polo-pair.png 왼쪽 비포 기준으로 색 맞춤. 눈 장식 버전 앞뒤는 어두운 남색을 밝힌 after-*-matched.png 사용. 원본 생성 파일 보존. 이후 버전도 같은 비포 색을 기준으로 사용.
 
 - 2026-11-12 최종: 지퍼/눈 장식 두 페이지 모두 blue-polo-common/before-back-relaxed.png를 같은 비율로 사용. 소매를 자연스럽게 내린 공통 비포 AI 재현본. 지퍼 애프터는 부분 왜곡 없이 원래 비율, 에리 기준 정렬. 눈 장식 애프터는 앞뒤 색을 공통 파랑으로 밝게 보정. 기존 원본 및 중간 생성본은 보존.
+
+## 흰티 리폼 찾기와 A/B 비교 (2026-11-21)
+- A `/`: 기존 landing 보존. B `/reform-guide`: 흰 반팔 티 고민/느낌 선택과 최대2개 추천.
+- 공유 상단에서 두 버전 전환. 제공 조건과 준비 상태를 표시. 운영 배포/백엔드 변경 없음.
+- 편집 데이터 `web/src/lib/reform-guide.ts`, 화면 `web/src/screens/reform-guide.tsx`, CSS `web/src/screens/reform-guide.css`.
+- 모바일390px/PC1440px에서 얼룩/구멍 선택, 이미지 로딩, 가로넘침 점검. TypeScript와 수정 파일 ESLint 통과. A/B 이동도 점검.
+- 고객 조사 및 구글 폼 복사 초안: `docs/customer-research-white-tee.md`. 아직 실제 Google Forms는 미생성. localhost 주소는 외부 고객에게 공유 불가.
